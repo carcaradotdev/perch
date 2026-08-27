@@ -87,10 +87,81 @@ class DeepLinkParserSchemeHostTest {
 
     assertEquals("acme://payments/abc123", subject.toUrl(PaymentLink("abc123")))
   }
+
+  // An https authority is a host whatever it looks like. These pin the rule that the scheme, not
+  // the shape of the authority, decides whether a URL has a host to check against `hosts`.
+
+  @Test
+  fun `a single label https host is still a host`() {
+    val subject = parser(schemes = setOf("acme", "https"), hosts = setOf("acme.com"))
+
+    assertNull(subject.parse("https://payments/abc123"))
+  }
+
+  @Test
+  fun `an empty https authority is rejected`() {
+    val guarded = parser(schemes = setOf("acme", "https"), hosts = setOf("acme.com"))
+    val open = parser(schemes = setOf("acme", "https"), hosts = emptySet())
+
+    assertNull(guarded.parse("https:///payments/abc123"))
+    assertNull(open.parse("https:///payments/abc123"))
+  }
+
+  @Test
+  fun `a port is not part of the host`() {
+    val subject = parser(schemes = setOf("https"), hosts = setOf("acme.com"))
+
+    assertIs<PaymentLink>(subject.parse("https://acme.com:8443/payments/abc123"))
+  }
+
+  @Test
+  fun `userinfo is not part of the host`() {
+    val subject = parser(schemes = setOf("https"), hosts = setOf("acme.com"))
+
+    assertIs<PaymentLink>(subject.parse("https://evil.example@acme.com/payments/abc123"))
+    assertNull(subject.parse("https://acme.com@evil.example/payments/abc123"))
+  }
+
+  @Test
+  fun `an uppercase host with userinfo and a port matches`() {
+    val subject = parser(schemes = setOf("https"), hosts = setOf("acme.com"))
+
+    assertIs<PaymentLink>(subject.parse("https://USER@ACME.COM:8443/payments/abc123"))
+  }
+
+  @Test
+  fun `an ipv6 literal host keeps its brackets`() {
+    val subject = parser(schemes = setOf("https"), hosts = setOf("[::1]"))
+
+    assertIs<PaymentLink>(subject.parse("https://[::1]:8080/payments/abc123"))
+  }
+
+  // A custom scheme has no authority to interpret: its first path element merely sits where a
+  // host would be in a hierarchical URL.
+
+  @Test
+  fun `a custom scheme keeps a dotted first path segment`() {
+    val subject = DeepLinkParser(schemes = setOf("acme")).apply { register<DottedLink>() }
+
+    assertIs<DottedLink>(subject.parse("acme://pay.co/abc123"))
+  }
+
+  @Test
+  fun `a custom scheme never consults the host set`() {
+    val subject = parser(schemes = setOf("acme"), hosts = setOf("acme.com"))
+
+    assertIs<PaymentLink>(subject.parse("acme://payments/abc123"))
+  }
 }
 
 @Serializable
 @Resource("/payments/{id}")
 private class PaymentLink(val id: String) : DeepLinkTarget {
+  override val requiresAuth: Boolean get() = true
+}
+
+@Serializable
+@Resource("/pay.co/{id}")
+private class DottedLink(val id: String) : DeepLinkTarget {
   override val requiresAuth: Boolean get() = true
 }

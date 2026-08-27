@@ -13,9 +13,16 @@ import kotlinx.serialization.serializer
  * - `{param?}` optional path parameter
  * - `{param...}` tailcard, matching the remaining segments
  *
- * A URL resolves only when its scheme is in [schemes]. When [hosts] is non-empty, the URL's host
- * must be in it as well, which is what keeps a look-alike `https` host from resolving a route the
- * app owns. A URL with no scheme is treated as a path and matched directly.
+ * A URL resolves only when its scheme is in [schemes], compared case-insensitively.
+ *
+ * Whether a URL has a host is decided by its scheme, not by what the URL looks like. `http` and
+ * `https` are hierarchical: the authority — everything between `://` and the next `/`, `?`, or
+ * `#` — is the host, with any `userinfo@` prefix and `:port` suffix dropped and an empty
+ * authority rejected as malformed. For those two schemes, and only those two, a non-empty [hosts]
+ * must contain the URL's host, which is what keeps a look-alike site from resolving a route the
+ * app owns. Every other scheme, and a URL with no scheme at all, has no host: `acme://payments/abc`
+ * merely puts its first path element where a host would sit, so [hosts] is not consulted and the
+ * whole URL is matched as a path.
  *
  * ```kotlin
  * val parser = DeepLinkParser(schemes = setOf("acme", "https"), hosts = setOf("acme.com"))

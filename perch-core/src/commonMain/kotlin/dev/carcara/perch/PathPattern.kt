@@ -224,6 +224,18 @@ internal class UrlLocation private constructor(
     private const val SCHEME_SEPARATOR = "://"
     private val schemePattern = Regex("^[a-zA-Z][a-zA-Z0-9+\\-.]*$")
 
+    /**
+     * Whether a URL has a host is a property of its scheme, never of what the authority happens
+     * to contain. In a hierarchical scheme the authority *is* the host by the definition of the
+     * URL syntax, single-label ones such as `https://payments/abc` included. A custom app scheme
+     * such as `acme://payments/abc` puts the first path element in the authority position by
+     * convention and has no host at all.
+     *
+     * Hardcoded rather than a constructor parameter: two schemes is not a configuration problem,
+     * and growing the public constructor for a case nobody has asked for is the worse trade.
+     */
+    private val hierarchicalSchemes = setOf("http", "https")
+
     fun of(url: String): UrlLocation? {
       val separatorIndex = url.indexOf(SCHEME_SEPARATOR)
       val scheme: String?
@@ -238,19 +250,25 @@ internal class UrlLocation private constructor(
         remainder = url
       }
 
-      val (beforeQuery, queryString) = remainder.split("?", limit = 2)
+      val host: String?
+      val afterAuthority: String
+      if (scheme != null && scheme in hierarchicalSchemes) {
+        val authorityEnd = remainder
+          .indexOfFirst { it == '/' || it == '?' || it == '#' }
+          .let { if (it < 0) remainder.length else it }
+        // An http(s) URL with no authority is malformed. Rejecting it is what stops
+        // `https:///payments/abc` from reaching a route without ever facing the host check.
+        host = hostOf(remainder.substring(0, authorityEnd)) ?: return null
+        afterAuthority = remainder.substring(authorityEnd)
+      } else {
+        host = null
+        afterAuthority = remainder
+      }
+
+      val (beforeQuery, queryString) = afterAuthority.split("?", limit = 2)
         .let { it[0] to it.getOrNull(1) }
 
-      // With a scheme present, the first segment is the authority. A custom-scheme link such as
-      // acme://payments/abc has "payments" as its authority, so it counts as a path segment too;
-      // only a hierarchical scheme carries a real host. Treat the first segment as a host only
-      // when the URL had an authority AND the segment contains a dot or is "localhost".
-      val rawSegments = beforeQuery.split("/").filter { it.isNotEmpty() }
-      val firstLooksLikeHost = rawSegments.firstOrNull()
-        ?.let { it.contains('.') || it.equals("localhost", ignoreCase = true) } == true
-
-      val host = if (scheme != null && firstLooksLikeHost) rawSegments.first().lowercase() else null
-      val pathSegments = if (host != null) rawSegments.drop(1) else rawSegments
+      val pathSegments = beforeQuery.split("/").filter { it.isNotEmpty() }
 
       val queryParameters = if (queryString != null) {
         Parameters.build {
@@ -264,6 +282,26 @@ internal class UrlLocation private constructor(
       }
 
       return UrlLocation(scheme, host, pathSegments, queryParameters)
+    }
+
+    /**
+     * The host of an authority, or null when the authority is empty or malformed. Drops the
+     * `userinfo@` prefix and the `:port` suffix, neither of which identifies the site, so
+     * `https://acme.com:8443/x` matches a configured host of `acme.com` while
+     * `https://acme.com@evil.example/x` is judged on `evil.example`.
+     */
+    private fun hostOf(authority: String): String? {
+      if (authority.isEmpty()) return null
+      val afterUserInfo = authority.substringAfterLast('@')
+      val host = if (afterUserInfo.startsWith("[")) {
+        // An IPv6 literal is bracketed, and only a colon after the brackets is a port.
+        val closingBracket = afterUserInfo.indexOf(']')
+        if (closingBracket < 0) return null
+        afterUserInfo.substring(0, closingBracket + 1)
+      } else {
+        afterUserInfo.substringBefore(':')
+      }
+      return host.lowercase().ifEmpty { null }
     }
   }
 }
