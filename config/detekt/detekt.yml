@@ -103,8 +103,6 @@ style:
     allowedNames: '(_|ignored|expected|serialVersionUID)'
   UtilityClassWithPublicConstructor:
     active: true
-    excludes:
-      - '**/CarcaraLocale.kt'
   WildcardImport:
     active: true
     excludeImports:
