@@ -1,6 +1,5 @@
 pluginManagement {
-  // Task 2 creates this directory; uncomment once it exists.
-  // includeBuild("perch-gradle-plugin")
+  includeBuild("perch-gradle-plugin")
   repositories {
     google {
       mavenContent {
