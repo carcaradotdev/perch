@@ -152,6 +152,60 @@ class DeepLinkParserSchemeHostTest {
 
     assertIs<PaymentLink>(subject.parse("acme://payments/abc123"))
   }
+
+  @Test
+  fun `a backslash terminates the authority`() {
+    val subject = parser(schemes = setOf("https"), hosts = setOf("acme.com"))
+
+    // A browser reads the host here as evil.example, because the WHATWG URL standard treats a
+    // backslash as a slash for a special scheme. Perch must not read it as acme.com.
+    assertNull(subject.parse("https://evil.example\\@acme.com/payments/abc123"))
+  }
+
+  // A fragment belongs to neither the path nor the query, in any scheme.
+
+  @Test
+  fun `a fragment is not part of a path parameter`() {
+    val subject = parser(schemes = setOf("https"), hosts = setOf("acme.com"))
+
+    val result = subject.parse("https://acme.com/payments/abc123#frag")
+
+    assertIs<PaymentLink>(result)
+    assertEquals("abc123", result.id)
+  }
+
+  @Test
+  fun `a fragment after a query string is stripped`() {
+    val subject = searchParser()
+
+    val result = subject.parse("https://acme.com/search?query=coffee#frag")
+
+    assertIs<SearchLink>(result)
+    assertEquals("coffee", result.query)
+  }
+
+  @Test
+  fun `a fragment containing a query string does not leak into the query`() {
+    val subject = searchParser()
+
+    val result = subject.parse("https://acme.com/search?query=coffee#x?query=evil")
+
+    assertIs<SearchLink>(result)
+    assertEquals("coffee", result.query)
+  }
+
+  @Test
+  fun `a fragment cannot inject a query parameter`() {
+    val subject = searchParser()
+
+    // The URL carries no query at all. Splitting the query off before the fragment would read
+    // `query=evil` out of the fragment and hand the route a parameter it was never given.
+    assertNull(subject.parse("https://acme.com/search#x?query=evil"))
+  }
+
+  private fun searchParser() =
+    DeepLinkParser(schemes = setOf("https"), hosts = setOf("acme.com"))
+      .apply { register<SearchLink>() }
 }
 
 @Serializable
@@ -163,5 +217,11 @@ private class PaymentLink(val id: String) : DeepLinkTarget {
 @Serializable
 @Resource("/pay.co/{id}")
 private class DottedLink(val id: String) : DeepLinkTarget {
+  override val requiresAuth: Boolean get() = true
+}
+
+@Serializable
+@Resource("/search")
+private class SearchLink(val query: String) : DeepLinkTarget {
   override val requiresAuth: Boolean get() = true
 }

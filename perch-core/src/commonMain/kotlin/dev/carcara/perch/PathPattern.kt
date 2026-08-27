@@ -253,8 +253,11 @@ internal class UrlLocation private constructor(
       val host: String?
       val afterAuthority: String
       if (scheme != null && scheme in hierarchicalSchemes) {
+        // A backslash ends the authority as well. The WHATWG URL standard treats it as a slash
+        // for a special scheme, so `https://evil.example\@acme.com/x` names evil.example to a
+        // browser. Stopping here is what keeps Perch from reading that same URL as acme.com.
         val authorityEnd = remainder
-          .indexOfFirst { it == '/' || it == '?' || it == '#' }
+          .indexOfFirst { it == '/' || it == '?' || it == '#' || it == '\\' }
           .let { if (it < 0) remainder.length else it }
         // An http(s) URL with no authority is malformed. Rejecting it is what stops
         // `https:///payments/abc` from reaching a route without ever facing the host check.
@@ -265,7 +268,11 @@ internal class UrlLocation private constructor(
         afterAuthority = remainder
       }
 
-      val (beforeQuery, queryString) = afterAuthority.split("?", limit = 2)
+      // The fragment belongs to neither the path nor the query, and it splits off first because a
+      // fragment may itself contain a '?'.
+      val beforeFragment = afterAuthority.substringBefore('#')
+
+      val (beforeQuery, queryString) = beforeFragment.split("?", limit = 2)
         .let { it[0] to it.getOrNull(1) }
 
       val pathSegments = beforeQuery.split("/").filter { it.isNotEmpty() }
