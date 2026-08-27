@@ -1,0 +1,138 @@
+build:
+  maxIssues: 0
+  excludeCorrectable: false
+
+config:
+  validation: true
+  warningsAsErrors: true
+
+processors:
+  active: true
+  exclude:
+    - 'DetektProgressListener'
+
+console-reports:
+  active: true
+
+output-reports:
+  active: true
+
+comments:
+  active: true
+  CommentOverPrivateProperty:
+    active: false
+  UndocumentedPublicClass:
+    active: false
+  UndocumentedPublicFunction:
+    active: false
+
+complexity:
+  active: true
+  CyclomaticComplexMethod:
+    active: false
+  LongMethod:
+    active: true
+    threshold: 80
+    ignoreAnnotated:
+      - 'Composable'
+  LongParameterList:
+    active: true
+    functionThreshold: 10
+    constructorThreshold: 12
+    ignoreAnnotated:
+      - 'Composable'
+  TooManyFunctions:
+    active: true
+    thresholdInFiles: 60
+    thresholdInClasses: 50
+    thresholdInInterfaces: 50
+    thresholdInObjects: 30
+    thresholdInEnums: 30
+  LargeClass:
+    active: true
+  NestedBlockDepth:
+    active: false
+
+coroutines:
+  active: true
+
+empty-blocks:
+  active: true
+
+exceptions:
+  active: true
+  TooGenericExceptionCaught:
+    active: false
+  TooGenericExceptionThrown:
+    active: false
+
+naming:
+  active: true
+  FunctionNaming:
+    active: false
+  TopLevelPropertyNaming:
+    active: true
+    constantPattern: '[A-Z][_A-Z0-9]*'
+    propertyPattern: '[A-Za-z][_A-Za-z0-9]*'
+    privatePropertyPattern: '_?[A-Za-z][_A-Za-z0-9]*'
+
+performance:
+  active: true
+  SpreadOperator:
+    active: false
+
+potential-bugs:
+  active: true
+
+style:
+  active: true
+  ForbiddenComment:
+    active: false
+  UseCheckOrError:
+    active: false
+  MagicNumber:
+    active: false
+  MaxLineLength:
+    active: false
+  ReturnCount:
+    active: false
+  UnusedImports:
+    active: true
+  UnusedPrivateMember:
+    active: true
+    allowedNames: '(_|ignored|expected|serialVersionUID)'
+  UtilityClassWithPublicConstructor:
+    active: true
+    excludes:
+      - '**/CarcaraLocale.kt'
+  WildcardImport:
+    active: true
+    excludeImports:
+      - 'java.util.*'
+      - 'kotlinx.android.synthetic.*'
+
+# Compose Rules (io.nlopez.compose.rules)
+Compose:
+  active: true
+  ComposableNaming:
+    active: true
+  ContentEmitterReturningValues:
+    active: true
+  ModifierMissing:
+    active: false
+  ModifierReused:
+    active: true
+  ModifierWithoutDefault:
+    active: false
+  MultipleEmitters:
+    active: true
+  MutableStateParam:
+    active: true
+  RememberMissing:
+    active: true
+  UnstableCollections:
+    active: false
+  ViewModelForwarding:
+    active: true
+  ViewModelInjection:
+    active: true
