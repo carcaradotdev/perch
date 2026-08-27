@@ -31,3 +31,4 @@ enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 rootProject.name = "perch"
 
 include(":perch-core")
+include(":perch-test")

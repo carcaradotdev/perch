@@ -8,7 +8,7 @@ kotlin {
   explicitApi()
 
   androidLibrary {
-    namespace = "dev.carcara.perch"
+    namespace = "dev.carcara.perch.test"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
     minSdk = libs.versions.android.minSdk.get().toInt()
   }
@@ -22,14 +22,8 @@ kotlin {
 
   sourceSets {
     commonMain.dependencies {
-      api(libs.ktor.resources)
-      implementation(libs.kotlinx.serialization.json)
+      api(projects.perchCore)
       implementation(libs.kotlinx.coroutines.core)
-    }
-    commonTest.dependencies {
-      implementation(libs.kotlin.test)
-      implementation(libs.kotlinx.coroutines.test)
-      implementation(projects.perchTest)
     }
   }
 }
