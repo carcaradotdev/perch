@@ -22,23 +22,27 @@ import kotlin.coroutines.coroutineContext
 import kotlin.reflect.KClass
 
 /**
- * Read-only view of [DeepLinkManager]'s deep-link processing state. Consumed by
- * the app's startup presenter so it can be tested without depending on the full
- * [DeepLinkManager] constructor surface.
+ * Read-only view of [DeepLinkManager]'s deep-link processing state.
+ *
+ * Exposed separately from [DeepLinkManager] so a consumer's cold-start logic can depend on this
+ * narrow surface instead of the full constructor.
  */
 public interface DeepLinkBootstrapState {
   /**
-   * True while a [DeepLinkRouteHandler] is running, OR while a handler-resolved
-   * target is still waiting on the auth/lock/nav-ready gate. The startup presenter
-   * combines this into its model so the splash stays visible end-to-end during
-   * cold-start handler execution and post-handler gate waits.
+   * True while a [DeepLinkRouteHandler] is running, or while a handler-resolved target is
+   * still waiting on the auth, lock or navigation-ready gate.
+   *
+   * A consumer that shows a loading screen on cold start should keep it up for as long as
+   * this stays true, so the covered window spans both the handler call and any post-handler
+   * gate wait.
    */
   public val isProcessingDeepLink: StateFlow<Boolean>
 
   /**
-   * True once the manager has performed navigation for a handler-driven deep link.
-   * The startup presenter must not call setRoot after this flips, otherwise it would
-   * wipe the deep-link destination.
+   * True once [DeepLinkManager] has navigated for a handler-driven deep link.
+   *
+   * A consumer that also sets an initial destination on cold start must not do so once this
+   * flips true, or it will overwrite the deep-link destination.
    */
   public val bootstrapTakenOver: StateFlow<Boolean>
 }
@@ -53,9 +57,9 @@ public interface DeepLinkBootstrapState {
  * once its root navigation stack has been mounted, so we never push onto
  * a half-initialised navigation controller.
  *
- * Lives as a singleton in the DI container. Every coroutine here runs on
- * [Dispatchers.Main] because [DeepLinkNavigator] calls end up touching UIKit /
- * Compose Nav3, both of which require the main thread.
+ * The caller owns the instance and the `scope` passed to its constructor; construct one
+ * instance per app. Every coroutine here runs on [Dispatchers.Main] because [DeepLinkNavigator]
+ * calls end up touching UIKit / Compose Nav3, both of which require the main thread.
  *
  * ## Custom route handlers
  *
@@ -97,6 +101,14 @@ public class DeepLinkManager public constructor(
   // public [pendingRoute] view exposes only the target, keeping mode tracking
   // an implementation detail.
   private val _pendingRoute = MutableStateFlow<PendingRoute?>(null)
+
+  /**
+   * The deep-link target queued for navigation, waiting on the auth, lock or
+   * navigation-ready gate.
+   *
+   * Null once [DeepLinkNavigator] has been given the target, or after [clearPendingRoute]
+   * drops it.
+   */
   public val pendingRoute: StateFlow<DeepLinkTarget?> = _pendingRoute
     .map { it?.route }
     .flowOn(Dispatchers.Main)
@@ -184,6 +196,11 @@ public class DeepLinkManager public constructor(
     _isNavigationReady.value = true
   }
 
+  /**
+   * Drops the queued deep link without navigating to it.
+   *
+   * [pendingRoute] becomes null; a later [handleRoute] call for the same target starts over.
+   */
   public fun clearPendingRoute() {
     _pendingRoute.value = null
   }
@@ -268,8 +285,8 @@ public class DeepLinkManager public constructor(
 
   /**
    * If the user is already on a screen of the same target type — e.g. a callback
-   * re-firing `carcara://creditApplication` with new params — replace it instead of stacking a
-   * duplicate, so the back button doesn't walk through stale copies. A deeplink to a different
+   * re-firing `acme://profile/42` with new params — replace it instead of stacking a
+   * duplicate, so the back button doesn't walk through stale copies. A deep link to a different
    * screen pushes normally. A plain in-app push still stacks, so detail→detail flows keep
    * their history.
    */

@@ -5,7 +5,8 @@ package dev.carcara.perch
  *
  * Use a handler when navigating to the original route requires a long-running setup step
  * (fetching state, resolving an id, deciding whether the user is allowed to land on the
- * screen, etc.). The handler runs as a `suspend` function on the IO dispatcher and the
+ * screen, etc.). The handler runs as a `suspend` function on [DeepLinkManager]'s
+ * `handlerDispatcher` — [kotlinx.coroutines.Dispatchers.Default] by default — and the
  * cold-start splash stays visible while it executes; warm-start runs silently in the
  * background with no extra UI.
  *

@@ -47,6 +47,7 @@ class DeepLinkManagerTest {
   private fun TestScope.createManager(
     navigationReady: Boolean = true,
     handlers: Map<KClass<out DeepLinkTarget>, DeepLinkRouteHandler<*>> = emptyMap(),
+    logger: DeepLinkLogger = DeepLinkLogger.None,
   ): DeepLinkManager {
     val testDispatcher = UnconfinedTestDispatcher(testScheduler)
     return DeepLinkManager(
@@ -57,6 +58,7 @@ class DeepLinkManagerTest {
       routeHandlers = handlers,
       scope = CoroutineScope(backgroundScope.coroutineContext + testDispatcher),
       handlerDispatcher = testDispatcher,
+      logger = logger,
     ).also { if (navigationReady) it.setNavigationReady() }
   }
 
@@ -260,6 +262,25 @@ class DeepLinkManagerTest {
   }
 
   @Test
+  fun `handler thrown error is reported to the logger with the thrown exception`() = runTest {
+    val logger = RecordingLogger()
+    val handler = DeepLinkRouteHandler<HandlerRoute> { _ -> throw IllegalStateException("boom") }
+    val manager = createManager(handlers = mapOf(HandlerRoute::class to handler), logger = logger)
+
+    manager.handleRoute(HandlerRoute)
+    advanceUntilIdle()
+
+    // kotlinx.coroutines' JVM stack-trace recovery can rethrow a copy of the original
+    // exception (same type and message, different identity), so this checks content
+    // rather than reference identity.
+    assertEquals(1, logger.errors.size)
+    val call = logger.errors.single()
+    assertEquals("Deep link handler failed for HandlerRoute", call.message)
+    assertEquals("boom", call.throwable?.message)
+    assertTrue(call.throwable is IllegalStateException)
+  }
+
+  @Test
   fun `isProcessingDeepLink is true while handler is suspended`() = runTest {
     val release = CompletableDeferred<Unit>()
     val handler = DeepLinkRouteHandler<HandlerRoute> { _ ->
@@ -448,4 +469,14 @@ private object HandlerRoute : DeepLinkTarget {
 
 private object OtherHandlerRoute : DeepLinkTarget {
   override val requiresAuth: Boolean = false
+}
+
+private class RecordingLogger : DeepLinkLogger {
+  data class ErrorCall(val message: String, val throwable: Throwable?)
+
+  val errors: MutableList<ErrorCall> = mutableListOf()
+
+  override fun error(message: String, throwable: Throwable?) {
+    errors += ErrorCall(message, throwable)
+  }
 }
