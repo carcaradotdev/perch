@@ -1,13 +1,14 @@
 plugins {
   alias(libs.plugins.kotlinMultiplatform)
   alias(libs.plugins.androidKmpLibrary)
+  alias(libs.plugins.metro)
 }
 
 kotlin {
   explicitApi()
 
   androidLibrary {
-    namespace = "dev.carcara.perch.test"
+    namespace = "dev.carcara.perch.metro"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
     minSdk = libs.versions.android.minSdk.get().toInt()
   }
