@@ -1,0 +1,269 @@
+package dev.carcara.perch
+
+import io.ktor.http.Parameters
+import io.ktor.resources.serialization.ResourcesFormat
+import kotlinx.serialization.KSerializer
+
+/**
+ * Reports whether two path patterns could match the same URL, which is what [DeepLinkParser]
+ * treats as a registration collision.
+ *
+ * Conflicts:
+ * - `/feature/list` against `/feature/list/`, which differ only by a trailing slash
+ * - `/feature/list` against `/feature/{id}`, where the parameter also matches the constant
+ * - `/feature/{id}` against `/feature/{name}`, which are structurally identical
+ *
+ * Non-conflicts:
+ * - `/feature/list` against `/feature/details`, two different constants
+ * - `/feature/list` against `/feature/list/details`, a different segment count
+ *
+ * Public because `perch-ksp` carries a second implementation of this rule — the processor is
+ * JVM-only and cannot depend on a multiplatform artefact — and its tests assert the two agree.
+ */
+public fun patternsConflict(pattern1: String, pattern2: String): Boolean {
+  val segments1 = pattern1.split("/").filter { it.isNotEmpty() }
+  val segments2 = pattern2.split("/").filter { it.isNotEmpty() }
+
+  if (segments1.size != segments2.size) {
+    return couldMatchWithOptionals(segments1, segments2)
+  }
+
+  for (i in segments1.indices) {
+    val seg1 = segments1[i]
+    val seg2 = segments2[i]
+
+    val seg1IsParam = seg1.startsWith("{") && seg1.endsWith("}")
+    val seg2IsParam = seg2.startsWith("{") && seg2.endsWith("}")
+
+    // Two constants conflict only when they are the same word. Any pairing that involves a
+    // parameter conflicts, because the parameter matches whatever sits opposite it.
+    if (!seg1IsParam && !seg2IsParam && seg1 != seg2) return false
+  }
+
+  return true
+}
+
+/**
+ * Reports whether patterns of different segment counts could still conflict, which happens when
+ * the shorter one ends in a tailcard or the longer one's extra segments are all optional.
+ */
+internal fun couldMatchWithOptionals(segments1: List<String>, segments2: List<String>): Boolean {
+  val shorter = if (segments1.size < segments2.size) segments1 else segments2
+  val longer = if (segments1.size < segments2.size) segments2 else segments1
+
+  if (shorter.isNotEmpty()) {
+    val lastSeg = shorter.last()
+    if (lastSeg.startsWith("{") && lastSeg.endsWith("...}")) {
+      // A tailcard matches any number of remaining segments.
+      for (i in 0 until shorter.size - 1) {
+        val seg1 = shorter[i]
+        val seg2 = longer.getOrNull(i) ?: return false
+        if (!segmentsCouldMatch(seg1, seg2)) return false
+      }
+      return true
+    }
+  }
+
+  if (shorter.size < longer.size) {
+    for (i in shorter.indices) {
+      if (!segmentsCouldMatch(shorter[i], longer[i])) return false
+    }
+    for (i in shorter.size until longer.size) {
+      val seg = longer[i]
+      val isOptional = seg.startsWith("{") && seg.endsWith("?}")
+      if (!isOptional) return false
+    }
+    return true
+  }
+
+  return false
+}
+
+/** Reports whether two single segments could match the same URL segment. */
+internal fun segmentsCouldMatch(seg1: String, seg2: String): Boolean {
+  val seg1IsParam = seg1.startsWith("{")
+  val seg2IsParam = seg2.startsWith("{")
+
+  return when {
+    !seg1IsParam && !seg2IsParam -> seg1 == seg2
+    else -> true
+  }
+}
+
+/**
+ * Pattern segment types, mirroring Ktor Server's `RouteSelector` hierarchy:
+ * - [Constant] matches a literal path segment
+ * - [Parameter] matches and captures a required path parameter, `{name}`
+ * - [OptionalParameter] matches and captures an optional path parameter, `{name?}`
+ * - [Tailcard] matches the remaining path segments, `{name...}`
+ */
+internal sealed class PathSegment {
+  abstract fun evaluate(segments: List<String>, index: Int): EvaluationResult?
+
+  data class Constant(val value: String) : PathSegment() {
+    override fun evaluate(segments: List<String>, index: Int): EvaluationResult? {
+      if (index >= segments.size) return null
+      if (segments[index] != value) return null
+      return EvaluationResult(Parameters.Empty, segmentIncrement = 1)
+    }
+  }
+
+  data class Parameter(val name: String) : PathSegment() {
+    override fun evaluate(segments: List<String>, index: Int): EvaluationResult? {
+      if (index >= segments.size) return null
+      val value = segments[index]
+      return EvaluationResult(
+        parameters = Parameters.build { append(name, value) },
+        segmentIncrement = 1,
+      )
+    }
+  }
+
+  data class OptionalParameter(val name: String) : PathSegment() {
+    override fun evaluate(segments: List<String>, index: Int): EvaluationResult {
+      if (index >= segments.size) {
+        return EvaluationResult(Parameters.Empty, segmentIncrement = 0)
+      }
+      val value = segments[index]
+      return EvaluationResult(
+        parameters = Parameters.build { append(name, value) },
+        segmentIncrement = 1,
+      )
+    }
+  }
+
+  data class Tailcard(val name: String) : PathSegment() {
+    override fun evaluate(segments: List<String>, index: Int): EvaluationResult {
+      val remaining = segments.drop(index)
+      val params = if (name.isNotEmpty() && remaining.isNotEmpty()) {
+        Parameters.build {
+          remaining.forEach { append(name, it) }
+        }
+      } else {
+        Parameters.Empty
+      }
+      return EvaluationResult(params, segmentIncrement = remaining.size)
+    }
+  }
+
+  data class EvaluationResult(
+    val parameters: Parameters,
+    val segmentIncrement: Int,
+  )
+
+  companion object {
+    fun parse(segment: String): PathSegment = when {
+      segment.startsWith("{") && segment.endsWith("...}") -> {
+        Tailcard(segment.substring(1, segment.length - 4))
+      }
+
+      segment.startsWith("{") && segment.endsWith("?}") -> {
+        OptionalParameter(segment.substring(1, segment.length - 2))
+      }
+
+      segment.startsWith("{") && segment.endsWith("}") -> {
+        Parameter(segment.substring(1, segment.length - 1))
+      }
+
+      else -> Constant(segment)
+    }
+  }
+}
+
+/** One registered route: its serialiser, its compiled path pattern, and the format to decode with. */
+internal class RegisteredRoute<T : DeepLinkTarget>(
+  private val serializer: KSerializer<T>,
+  pathPattern: String,
+  private val format: ResourcesFormat,
+) {
+  private val segments: List<PathSegment> = pathPattern
+    .split("/")
+    .filter { it.isNotEmpty() }
+    .map { PathSegment.parse(it) }
+
+  private val hasTailcard: Boolean = segments.any { it is PathSegment.Tailcard }
+
+  fun tryParse(urlSegments: List<String>, queryParams: Parameters): T? {
+    val pathParams = matchPattern(urlSegments) ?: return null
+
+    val allParams = Parameters.build {
+      appendAll(pathParams)
+      appendAll(queryParams)
+    }
+
+    return runCatching { format.decodeFromParameters(serializer, allParams) }.getOrNull()
+  }
+
+  private fun matchPattern(urlSegments: List<String>): Parameters? {
+    var urlIndex = 0
+    val collectedParams = Parameters.build {
+      for (segment in segments) {
+        val result = segment.evaluate(urlSegments, urlIndex) ?: return null
+        appendAll(result.parameters)
+        urlIndex += result.segmentIncrement
+      }
+    }
+
+    // Every URL segment must be consumed, unless a tailcard swallowed the rest.
+    if (!hasTailcard && urlIndex != urlSegments.size) {
+      return null
+    }
+
+    return collectedParams
+  }
+}
+
+/** Scheme, host, path segments, and query of a deep-link URL, with no host-relative guessing. */
+internal class UrlLocation private constructor(
+  val scheme: String?,
+  val host: String?,
+  val pathSegments: List<String>,
+  val queryParameters: Parameters,
+) {
+  companion object {
+    private const val SCHEME_SEPARATOR = "://"
+    private val schemePattern = Regex("^[a-zA-Z][a-zA-Z0-9+\\-.]*$")
+
+    fun of(url: String): UrlLocation? {
+      val separatorIndex = url.indexOf(SCHEME_SEPARATOR)
+      val scheme: String?
+      val remainder: String
+      if (separatorIndex > 0) {
+        val candidate = url.substring(0, separatorIndex)
+        if (!schemePattern.matches(candidate)) return null
+        scheme = candidate.lowercase()
+        remainder = url.substring(separatorIndex + SCHEME_SEPARATOR.length)
+      } else {
+        scheme = null
+        remainder = url
+      }
+
+      val (beforeQuery, queryString) = remainder.split("?", limit = 2)
+        .let { it[0] to it.getOrNull(1) }
+
+      // With a scheme present, the first segment is the authority. A custom-scheme link such as
+      // acme://payments/abc has "payments" as its authority, so it counts as a path segment too;
+      // only a hierarchical scheme carries a real host. Treat the first segment as a host only
+      // when the URL had an authority AND the segment contains a dot or is "localhost".
+      val rawSegments = beforeQuery.split("/").filter { it.isNotEmpty() }
+      val firstLooksLikeHost = rawSegments.firstOrNull()
+        ?.let { it.contains('.') || it.equals("localhost", ignoreCase = true) } == true
+
+      val host = if (scheme != null && firstLooksLikeHost) rawSegments.first().lowercase() else null
+      val pathSegments = if (host != null) rawSegments.drop(1) else rawSegments
+
+      val queryParameters = if (queryString != null) {
+        Parameters.build {
+          queryString.split("&").forEach { param ->
+            val kv = param.split("=", limit = 2)
+            if (kv.size == 2) append(kv[0], kv[1])
+          }
+        }
+      } else {
+        Parameters.Empty
+      }
+
+      return UrlLocation(scheme, host, pathSegments, queryParameters)
+    }
+  }
+}
