@@ -213,6 +213,18 @@ internal class RegisteredRoute<T : DeepLinkTarget>(
   }
 }
 
+/**
+ * Whether a URL has a host is a property of its scheme, never of what the authority happens to
+ * contain. In a hierarchical scheme the authority *is* the host by the definition of the URL
+ * syntax, single-label ones such as `https://payments/abc` included. A custom app scheme such as
+ * `acme://payments/abc` puts the first path element in the authority position by convention and
+ * has no host at all.
+ *
+ * Hardcoded rather than a constructor parameter: two schemes is not a configuration problem, and
+ * growing the public constructor for a case nobody has asked for is the worse trade.
+ */
+internal val HIERARCHICAL_SCHEMES: Set<String> = setOf("http", "https")
+
 /** Scheme, host, path segments, and query of a deep-link URL, with no host-relative guessing. */
 internal class UrlLocation private constructor(
   val scheme: String?,
@@ -223,20 +235,10 @@ internal class UrlLocation private constructor(
   companion object {
     private const val SCHEME_SEPARATOR = "://"
     private val schemePattern = Regex("^[a-zA-Z][a-zA-Z0-9+\\-.]*$")
+    private val schemePrefixPattern = Regex("^[a-zA-Z][a-zA-Z0-9+\\-.]*:")
 
-    /**
-     * Whether a URL has a host is a property of its scheme, never of what the authority happens
-     * to contain. In a hierarchical scheme the authority *is* the host by the definition of the
-     * URL syntax, single-label ones such as `https://payments/abc` included. A custom app scheme
-     * such as `acme://payments/abc` puts the first path element in the authority position by
-     * convention and has no host at all.
-     *
-     * Hardcoded rather than a constructor parameter: two schemes is not a configuration problem,
-     * and growing the public constructor for a case nobody has asked for is the worse trade.
-     */
-    private val hierarchicalSchemes = setOf("http", "https")
-
-    fun of(url: String): UrlLocation? {
+    fun of(rawUrl: String): UrlLocation? {
+      val url = rawUrl.trim()
       val separatorIndex = url.indexOf(SCHEME_SEPARATOR)
       val scheme: String?
       val remainder: String
@@ -246,13 +248,19 @@ internal class UrlLocation private constructor(
         scheme = candidate.lowercase()
         remainder = url.substring(separatorIndex + SCHEME_SEPARATOR.length)
       } else {
+        // A schemeless string is matched as a path and faces neither gate, so anything still
+        // carrying a scheme must be rejected rather than demoted to one. `https:/evil.example/x`
+        // and `https:\evil.example/x` are hierarchical URLs to a browser but have no "://", and
+        // would otherwise arrive as an ordinary first path segment. The character class excludes
+        // '/', so an honest path keeps parsing even with a colon in a later segment.
+        if (schemePrefixPattern.containsMatchIn(url)) return null
         scheme = null
         remainder = url
       }
 
       val host: String?
       val afterAuthority: String
-      if (scheme != null && scheme in hierarchicalSchemes) {
+      if (scheme != null && scheme in HIERARCHICAL_SCHEMES) {
         // A backslash ends the authority as well. The WHATWG URL standard treats it as a slash
         // for a special scheme, so `https://evil.example\@acme.com/x` names evil.example to a
         // browser. Stopping here is what keeps Perch from reading that same URL as acme.com.
@@ -276,19 +284,17 @@ internal class UrlLocation private constructor(
         .let { it[0] to it.getOrNull(1) }
 
       val pathSegments = beforeQuery.split("/").filter { it.isNotEmpty() }
-
-      val queryParameters = if (queryString != null) {
-        Parameters.build {
-          queryString.split("&").forEach { param ->
-            val kv = param.split("=", limit = 2)
-            if (kv.size == 2) append(kv[0], kv[1])
-          }
-        }
-      } else {
-        Parameters.Empty
-      }
+      val queryParameters = queryString?.let(::parametersOf) ?: Parameters.Empty
 
       return UrlLocation(scheme, host, pathSegments, queryParameters)
+    }
+
+    /** The `a=1&b=2` pairs of a query string. A fragment of a pair with no `=` is discarded. */
+    private fun parametersOf(query: String): Parameters = Parameters.build {
+      query.split("&").forEach { param ->
+        val pair = param.split("=", limit = 2)
+        if (pair.size == 2) append(pair[0], pair[1])
+      }
     }
 
     /**

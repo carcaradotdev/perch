@@ -13,18 +13,28 @@ import kotlinx.serialization.serializer
  * - `{param?}` optional path parameter
  * - `{param...}` tailcard, matching the remaining segments
  *
- * A URL resolves only when its scheme is in [schemes], compared case-insensitively.
+ * A URL that carries a scheme resolves only when that scheme is in [schemes], compared
+ * case-insensitively. **A URL with no scheme is matched as a path and faces neither the scheme
+ * check nor the host check** — `payments/abc123` and `/payments/abc123` both resolve. The marginal
+ * risk is nil, since anyone able to choose the string could pass a bare path anyway, but do not
+ * read [schemes] as a guarantee about every input. A string carrying a scheme in some form other
+ * than `scheme://`, such as `https:/evil.example/x`, is rejected rather than treated as a path.
  *
  * Whether a URL has a host is decided by its scheme, not by what the URL looks like. `http` and
  * `https` are hierarchical: the authority — everything between `://` and the next `/`, `?`, `#`, or
  * `\` — is the host, with any `userinfo@` prefix and `:port` suffix dropped and an empty authority
- * rejected as malformed. For those two schemes, and only those two, a non-empty [hosts] must
- * contain the URL's host, which is what keeps a look-alike site from resolving a route the app
- * owns. Every other scheme, and a URL with no scheme at all, has no host: `acme://payments/abc`
- * merely puts its first path element where a host would sit, so [hosts] is not consulted and the
- * whole URL is matched as a path.
+ * rejected as malformed. An IPv6 host keeps its brackets, so configure it as `setOf("[::1]")`. For
+ * those two schemes, and only those two, [hosts] must contain the URL's host, which is what keeps a
+ * look-alike site from resolving a route the app owns. Every other scheme has no host:
+ * `acme://payments/abc` merely puts its first path element where a host would sit, so [hosts] is
+ * not consulted.
  *
- * A fragment is discarded, in every scheme, before the path and query are read.
+ * Because an empty [hosts] would mean "any website may deep-link into these routes", the
+ * constructor **rejects `http` or `https` in [schemes] unless [hosts] is non-empty**. Custom
+ * schemes are unaffected: for them [hosts] is meaningless and may stay empty.
+ *
+ * A fragment is discarded, in every scheme, before the path and query are read. Surrounding
+ * whitespace is trimmed. Nothing is percent-decoded.
  *
  * ```kotlin
  * val parser = DeepLinkParser(schemes = setOf("acme", "https"), hosts = setOf("acme.com"))
@@ -46,19 +56,27 @@ public class DeepLinkParser(
   private val logger: DeepLinkLogger = DeepLinkLogger.None,
 ) {
 
-  init {
-    require(schemes.isNotEmpty()) { "DeepLinkParser needs at least one scheme" }
-  }
-
   private val schemes: Set<String> = schemes.map { it.lowercase() }.toSet()
   private val hosts: Set<String> = hosts.map { it.lowercase() }.toSet()
+
+  init {
+    // `this.` throughout: a constructor parameter shadows the property of the same name inside an
+    // initialiser, and the parameters here are the un-lowercased originals.
+    require(this.schemes.isNotEmpty()) { "DeepLinkParser needs at least one scheme" }
+    val hierarchical = this.schemes.filter { it in HIERARCHICAL_SCHEMES }
+    require(hierarchical.isEmpty() || this.hosts.isNotEmpty()) {
+      "DeepLinkParser was given $hierarchical with no hosts, which lets any website on the " +
+        "internet deep-link into these routes. Pass the domains you own, for example " +
+        "hosts = setOf(\"example.com\"), or drop http and https from schemes."
+    }
+  }
 
   /**
    * Scheme [toUrl] emits, which is the first entry of [schemes]. `@PublishedApi internal`
    * rather than private: [toUrl] is inline with a reified type, so it cannot read a private member.
    */
   @PublishedApi
-  internal val canonicalScheme: String = schemes.first()
+  internal val canonicalScheme: String = this.schemes.first()
 
   @PublishedApi
   internal val format: ResourcesFormat = ResourcesFormat()

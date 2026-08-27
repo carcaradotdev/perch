@@ -4,6 +4,7 @@ import io.ktor.resources.Resource
 import kotlinx.serialization.Serializable
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 
@@ -54,10 +55,19 @@ class DeepLinkParserSchemeHostTest {
   }
 
   @Test
-  fun `an empty host set accepts any host`() {
-    val subject = parser(schemes = setOf("acme", "https"), hosts = emptySet())
+  fun `a hierarchical scheme with no hosts is rejected at construction`() {
+    // Registering https with no hosts means "any website may deep-link into these routes", which
+    // is the vulnerability this whole design removes, reached by omitting an optional parameter.
+    assertFailsWith<IllegalArgumentException> {
+      DeepLinkParser(schemes = setOf("acme", "https"))
+    }
+  }
 
-    assertIs<PaymentLink>(subject.parse("https://anything.example/payments/abc123"))
+  @Test
+  fun `a custom scheme with no hosts is fine`() {
+    val subject = DeepLinkParser(schemes = setOf("acme")).apply { register<PaymentLink>() }
+
+    assertIs<PaymentLink>(subject.parse("acme://payments/abc123"))
   }
 
   @Test
@@ -83,9 +93,35 @@ class DeepLinkParserSchemeHostTest {
 
   @Test
   fun `toUrl uses the first configured scheme`() {
-    val subject = DeepLinkParser(schemes = setOf("acme", "https"))
+    val subject = DeepLinkParser(schemes = setOf("acme", "https"), hosts = setOf("acme.com"))
 
     assertEquals("acme://payments/abc123", subject.toUrl(PaymentLink("abc123")))
+  }
+
+  @Test
+  fun `toUrl emits the scheme lowercased`() {
+    val subject = DeepLinkParser(schemes = setOf("ACME"))
+
+    assertEquals("acme://payments/abc123", subject.toUrl(PaymentLink("abc123")))
+  }
+
+  @Test
+  fun `schemes and hosts configured in uppercase still match`() {
+    val subject = DeepLinkParser(schemes = setOf("ACME", "HTTPS"), hosts = setOf("ACME.COM"))
+      .apply { register<PaymentLink>() }
+
+    assertIs<PaymentLink>(subject.parse("acme://payments/abc123"))
+    assertIs<PaymentLink>(subject.parse("https://acme.com/payments/abc123"))
+  }
+
+  @Test
+  fun `surrounding whitespace is ignored`() {
+    val subject = parser(schemes = setOf("https"), hosts = setOf("acme.com"))
+
+    val result = subject.parse("  https://acme.com/payments/abc123  ")
+
+    assertIs<PaymentLink>(result)
+    assertEquals("abc123", result.id)
   }
 
   // An https authority is a host whatever it looks like. These pin the rule that the scheme, not
@@ -100,11 +136,9 @@ class DeepLinkParserSchemeHostTest {
 
   @Test
   fun `an empty https authority is rejected`() {
-    val guarded = parser(schemes = setOf("acme", "https"), hosts = setOf("acme.com"))
-    val open = parser(schemes = setOf("acme", "https"), hosts = emptySet())
+    val subject = parser(schemes = setOf("acme", "https"), hosts = setOf("acme.com"))
 
-    assertNull(guarded.parse("https:///payments/abc123"))
-    assertNull(open.parse("https:///payments/abc123"))
+    assertNull(subject.parse("https:///payments/abc123"))
   }
 
   @Test
@@ -134,6 +168,31 @@ class DeepLinkParserSchemeHostTest {
     val subject = parser(schemes = setOf("https"), hosts = setOf("[::1]"))
 
     assertIs<PaymentLink>(subject.parse("https://[::1]:8080/payments/abc123"))
+  }
+
+  // `of()` recognises a scheme by "://". A string carrying a scheme in any other form must be
+  // rejected outright rather than demoted to a schemeless path, where neither gate would run.
+  // A tenant-style route is what makes the difference visible: against `/payments/{id}` these
+  // URLs fail on segment count, which is an accident, not a rule.
+
+  @Test
+  fun `a scheme without a double slash cannot launder into a schemeless path`() {
+    val subject = DeepLinkParser(schemes = setOf("https"), hosts = setOf("acme.com"))
+      .apply { register<TenantLink>() }
+
+    assertNull(subject.parse("https:\\evil.example/payments/abc123"))
+    assertNull(subject.parse("https:/evil.example/payments/abc123"))
+    assertNull(subject.parse("https:evil.example/payments/abc123"))
+  }
+
+  @Test
+  fun `a schemeless path may carry a colon after its first segment`() {
+    val subject = parser()
+
+    val result = subject.parse("payments/a:b")
+
+    assertIs<PaymentLink>(result)
+    assertEquals("a:b", result.id)
   }
 
   // A custom scheme has no authority to interpret: its first path element merely sits where a
@@ -223,5 +282,11 @@ private class DottedLink(val id: String) : DeepLinkTarget {
 @Serializable
 @Resource("/search")
 private class SearchLink(val query: String) : DeepLinkTarget {
+  override val requiresAuth: Boolean get() = true
+}
+
+@Serializable
+@Resource("/{tenant}/payments/{id}")
+private class TenantLink(val tenant: String, val id: String) : DeepLinkTarget {
   override val requiresAuth: Boolean get() = true
 }
