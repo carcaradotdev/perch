@@ -65,8 +65,8 @@ class DeepLinkProcessorTest {
     val text = generated.readText()
 
     assertTrue(text.contains("internal fun DeepLinkParser.registerDeepLinks()"))
-    assertTrue(text.contains("register<HomeLink>()"))
-    assertTrue(text.contains("register<PaymentLink>()"))
+    assertTrue(text.contains("register<com.acme.home.HomeLink>()"))
+    assertTrue(text.contains("register<com.acme.home.PaymentLink>()"))
     assertTrue(!text.contains("NotADeepLink"))
   }
 
@@ -143,6 +143,58 @@ class DeepLinkProcessorTest {
     val result = compile(routeSource, outputPackage = "")
 
     assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode)
+    val generated = File(result.outputDirectory.parentFile, "ksp/sources/kotlin/com/acme/home/DeepLinkRegistration.kt")
+    assertTrue(!generated.exists())
+    val manifest = File(
+      result.outputDirectory.parentFile,
+      "ksp/sources/resources/perch-manifest-com-acme-home.txt",
+    )
+    assertTrue(!manifest.exists())
+  }
+
+  @Test
+  fun `two routes with the same simple name in different packages both register fully qualified`() {
+    val first = SourceFile.kotlin(
+      "First.kt",
+      """
+      package com.acme.a
+
+      import dev.carcara.perch.DeepLinkTarget
+      import io.ktor.resources.Resource
+      import kotlinx.serialization.Serializable
+
+      @Serializable
+      @Resource("/a/details")
+      class Details : DeepLinkTarget {
+        override val requiresAuth: Boolean get() = false
+      }
+      """,
+    )
+    val second = SourceFile.kotlin(
+      "Second.kt",
+      """
+      package com.acme.b
+
+      import dev.carcara.perch.DeepLinkTarget
+      import io.ktor.resources.Resource
+      import kotlinx.serialization.Serializable
+
+      @Serializable
+      @Resource("/b/details")
+      class Details : DeepLinkTarget {
+        override val requiresAuth: Boolean get() = false
+      }
+      """,
+    )
+
+    val result = compile(first, second, outputPackage = "com.acme.merged")
+
+    assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode)
+    val generated = File(result.outputDirectory.parentFile, "ksp/sources/kotlin/com/acme/merged/DeepLinkRegistration.kt")
+    val text = generated.readText()
+
+    assertTrue(text.contains("register<com.acme.a.Details>()"))
+    assertTrue(text.contains("register<com.acme.b.Details>()"))
   }
 
   @Test

@@ -93,7 +93,7 @@ internal class DeepLinkProcessor(
 
   private fun generateRegistrationFile(packageName: String, routeClasses: List<KSClassDeclaration>) {
     val routeInfoList = mutableListOf<RouteInfo>()
-    val registeredRoutes = mutableListOf<Pair<String, String>>() // path -> routeName
+    val registeredRoutes = mutableListOf<Pair<String, String>>()
 
     routeClasses.forEach { classDecl ->
       val path = getResourcePath(classDecl) ?: return@forEach
@@ -126,16 +126,12 @@ internal class DeepLinkProcessor(
 
     OutputStreamWriter(file).use { writer ->
       writer.write("package $packageName\n\n")
-
-      val imports = mutableSetOf<String>()
-      imports.add(parserClass)
-      routeClasses.forEach { classDecl ->
-        classDecl.qualifiedName?.asString()?.let { imports.add(it) }
-      }
-
-      imports.sorted().forEach { import ->
-        writer.write("import $import\n")
-      }
+      // Only the parser needs an import: the receiver of the extension below. Route type
+      // arguments are written fully qualified, on purpose. Importing them by simple name would
+      // collide the moment two routes in this module share a simple name from different
+      // packages - `com.acme.a.Details` and `com.acme.b.Details` - which scanning the whole
+      // module (rather than one guessed package) makes an ordinary occurrence, not a rare one.
+      writer.write("import $parserClass\n")
 
       writer.write("\n")
       writer.write("/**\n")
@@ -146,7 +142,7 @@ internal class DeepLinkProcessor(
       val parserSimpleName = parserClass.substringAfterLast(".")
       writer.write("internal fun $parserSimpleName.registerDeepLinks() {\n")
       routeClasses.sortedBy { it.qualifiedName?.asString() }.forEach { classDecl ->
-        writer.write("  register<${classDecl.simpleName.asString()}>()\n")
+        writer.write("  register<${classDecl.qualifiedName?.asString()}>()\n")
       }
       writer.write("}\n")
     }
