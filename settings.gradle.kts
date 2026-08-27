@@ -33,3 +33,4 @@ rootProject.name = "perch"
 include(":perch-core")
 include(":perch-test")
 include(":perch-metro")
+include(":perch-ksp")
