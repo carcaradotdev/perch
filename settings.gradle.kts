@@ -38,6 +38,12 @@ include(":perch-test")
 include(":perch-metro")
 include(":perch-ksp")
 
+// The sample is not published; it exists to run the whole KSP-and-aggregation pipeline. Naming
+// these two paths also creates the intermediate project `:sample`, which has no build file and no
+// source of its own.
+include(":sample:sample-routes")
+include(":sample:sample-app")
+
 // Isolated Projects forbids `subprojects { }` (it is cross-project access from root-project
 // scope). `beforeProject` registered here runs once per project in an isolated context private
 // to that project, which is the sanctioned replacement: see
@@ -66,10 +72,19 @@ gradle.lifecycle.beforeProject {
 // convention plugin. Reading `pluginManager` here is this project inspecting its own state from
 // within its own isolated `afterProject` context, not reaching into a neighbour.
 gradle.lifecycle.afterProject {
-  // The root project has no Kotlin source of its own; nothing else is exempt today; a future
-  // module with a genuine reason to skip detekt should be added here explicitly; adding it here
-  // is a visible decision, not a silent gap.
-  if (path == ":") return@afterProject
+  // What is exempt is decided structurally, not by name: a project that applies no Kotlin plugin
+  // compiles nothing, so detekt would have no source to lint there and requiring the convention
+  // plugin would only be noise. That covers the root project, and it covers the container project
+  // Gradle creates implicitly for a nested path - `include(":sample:sample-app")` brings `:sample`
+  // into the build with no build file and no source. A hardcoded path list would have to grow an
+  // entry every time either of those appears, and an entry added to silence an error is exactly
+  // how a real module ends up exempt by accident.
+  val kotlinPluginIds = listOf(
+    "org.jetbrains.kotlin.multiplatform",
+    "org.jetbrains.kotlin.jvm",
+    "org.jetbrains.kotlin.android",
+  )
+  if (kotlinPluginIds.none { pluginManager.hasPlugin(it) }) return@afterProject
 
   if (!pluginManager.hasPlugin("dev.carcara.perch.detekt")) {
     throw GradleException(
