@@ -1,5 +1,6 @@
 plugins {
   `kotlin-dsl`
+  `maven-publish`
 }
 
 group = "dev.carcara.perch"
@@ -45,6 +46,41 @@ gradlePlugin {
     create("perchAggregation") {
       id = "dev.carcara.perch.aggregation"
       implementationClass = "dev.carcara.perch.gradle.PerchAggregationPlugin"
+    }
+  }
+}
+
+// `kotlin-dsl` already applies `java-gradle-plugin`, which - once `maven-publish` is applied too -
+// generates the main "pluginMaven" publication plus one marker publication per plugin declared
+// above; the marker is what lets a consumer resolve `plugins { id("dev.carcara.perch") }` from
+// this coordinate. This build has no version catalog plugin aliases to mirror (`com.vanniktech.
+// maven.publish` targets Kotlin Multiplatform/Android publications, neither of which this
+// JVM-only, single-module build has), so it configures the POM directly rather than through the
+// `dev.carcara.perch.publishing` convention plugin used by the library modules.
+publishing {
+  publications.withType<MavenPublication>().configureEach {
+    pom {
+      name.set("perch-gradle-plugin")
+      description.set("Gradle plugins for Perch, a type-safe deep-link library for Kotlin Multiplatform")
+      url.set("https://github.com/carcaradotdev/perch")
+      licenses {
+        license {
+          name.set("The Apache License, Version 2.0")
+          url.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
+        }
+      }
+      developers {
+        developer {
+          id.set("carcaradotdev")
+          name.set("Carcara")
+          url.set("https://github.com/carcaradotdev")
+        }
+      }
+      scm {
+        url.set("https://github.com/carcaradotdev/perch")
+        connection.set("scm:git:git://github.com/carcaradotdev/perch.git")
+        developerConnection.set("scm:git:ssh://git@github.com/carcaradotdev/perch.git")
+      }
     }
   }
 }

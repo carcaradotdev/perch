@@ -1,6 +1,7 @@
 plugins {
   kotlin("jvm")
   id("dev.carcara.perch.detekt")
+  id("dev.carcara.perch.publishing")
 }
 
 kotlin {

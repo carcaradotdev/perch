@@ -1,0 +1,69 @@
+public final class dev/carcara/perch/metro/DeepLinkBindings {
+	public static final field INSTANCE Ldev/carcara/perch/metro/DeepLinkBindings;
+	public final fun provideDeepLinkBootstrapState (Ldev/carcara/perch/DeepLinkManager;)Ldev/carcara/perch/DeepLinkBootstrapState;
+	public final fun provideDeepLinkHandlerDispatcher ()Lkotlinx/coroutines/CoroutineDispatcher;
+	public final fun provideDeepLinkManager (Ldev/carcara/perch/DeepLinkNavigator;Ldev/carcara/perch/DeepLinkParser;Lkotlinx/coroutines/CoroutineScope;Ldev/carcara/perch/DeepLinkAuthGate;Ldev/carcara/perch/DeepLinkLockGate;Ljava/util/Map;Lkotlinx/coroutines/CoroutineDispatcher;)Ldev/carcara/perch/DeepLinkManager;
+}
+
+public final class dev/carcara/perch/metro/DeepLinkBindings$ProvideDeepLinkBootstrapStateMetroFactory : dev/zacsweers/metro/internal/Factory {
+	public static final field Companion Ldev/carcara/perch/metro/DeepLinkBindings$ProvideDeepLinkBootstrapStateMetroFactory$Companion;
+	public synthetic fun <init> (Ldev/zacsweers/metro/Provider;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public static final fun create (Ldev/zacsweers/metro/Provider;)Ldev/carcara/perch/metro/DeepLinkBindings$ProvideDeepLinkBootstrapStateMetroFactory;
+	public final fun invoke ()Ldev/carcara/perch/DeepLinkBootstrapState;
+	public synthetic fun invoke ()Ljava/lang/Object;
+	public final fun mirrorFunction (Ldev/carcara/perch/DeepLinkManager;)Ldev/carcara/perch/DeepLinkBootstrapState;
+	public static final fun provideDeepLinkBootstrapState (Ldev/carcara/perch/DeepLinkManager;)Ldev/carcara/perch/DeepLinkBootstrapState;
+}
+
+public final class dev/carcara/perch/metro/DeepLinkBindings$ProvideDeepLinkBootstrapStateMetroFactory$Companion {
+	public final fun create (Ldev/zacsweers/metro/Provider;)Ldev/carcara/perch/metro/DeepLinkBindings$ProvideDeepLinkBootstrapStateMetroFactory;
+	public final fun provideDeepLinkBootstrapState (Ldev/carcara/perch/DeepLinkManager;)Ldev/carcara/perch/DeepLinkBootstrapState;
+}
+
+public final class dev/carcara/perch/metro/DeepLinkBindings$ProvideDeepLinkHandlerDispatcherMetroFactory : dev/zacsweers/metro/internal/Factory {
+	public static final field INSTANCE Ldev/carcara/perch/metro/DeepLinkBindings$ProvideDeepLinkHandlerDispatcherMetroFactory;
+	public static final fun create ()Ldev/carcara/perch/metro/DeepLinkBindings$ProvideDeepLinkHandlerDispatcherMetroFactory;
+	public synthetic fun invoke ()Ljava/lang/Object;
+	public final fun invoke ()Lkotlinx/coroutines/CoroutineDispatcher;
+	public final fun mirrorFunction ()Lkotlinx/coroutines/CoroutineDispatcher;
+	public static final fun provideDeepLinkHandlerDispatcher ()Lkotlinx/coroutines/CoroutineDispatcher;
+}
+
+public final class dev/carcara/perch/metro/DeepLinkBindings$ProvideDeepLinkManagerMetroFactory : dev/zacsweers/metro/internal/Factory {
+	public static final field Companion Ldev/carcara/perch/metro/DeepLinkBindings$ProvideDeepLinkManagerMetroFactory$Companion;
+	public synthetic fun <init> (Ldev/zacsweers/metro/Provider;Ldev/zacsweers/metro/Provider;Ldev/zacsweers/metro/Provider;Ldev/zacsweers/metro/Provider;Ldev/zacsweers/metro/Provider;Ldev/zacsweers/metro/Provider;Ldev/zacsweers/metro/Provider;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public static final fun create (Ldev/zacsweers/metro/Provider;Ldev/zacsweers/metro/Provider;Ldev/zacsweers/metro/Provider;Ldev/zacsweers/metro/Provider;Ldev/zacsweers/metro/Provider;Ldev/zacsweers/metro/Provider;Ldev/zacsweers/metro/Provider;)Ldev/carcara/perch/metro/DeepLinkBindings$ProvideDeepLinkManagerMetroFactory;
+	public final fun invoke ()Ldev/carcara/perch/DeepLinkManager;
+	public synthetic fun invoke ()Ljava/lang/Object;
+	public final fun mirrorFunction (Ldev/carcara/perch/DeepLinkNavigator;Ldev/carcara/perch/DeepLinkParser;Lkotlinx/coroutines/CoroutineScope;Ldev/carcara/perch/DeepLinkAuthGate;Ldev/carcara/perch/DeepLinkLockGate;Ljava/util/Map;Lkotlinx/coroutines/CoroutineDispatcher;)Ldev/carcara/perch/DeepLinkManager;
+	public static final fun provideDeepLinkManager (Ldev/carcara/perch/DeepLinkNavigator;Ldev/carcara/perch/DeepLinkParser;Lkotlinx/coroutines/CoroutineScope;Ldev/carcara/perch/DeepLinkAuthGate;Ldev/carcara/perch/DeepLinkLockGate;Ljava/util/Map;Lkotlinx/coroutines/CoroutineDispatcher;)Ldev/carcara/perch/DeepLinkManager;
+}
+
+public final class dev/carcara/perch/metro/DeepLinkBindings$ProvideDeepLinkManagerMetroFactory$Companion {
+	public final fun create (Ldev/zacsweers/metro/Provider;Ldev/zacsweers/metro/Provider;Ldev/zacsweers/metro/Provider;Ldev/zacsweers/metro/Provider;Ldev/zacsweers/metro/Provider;Ldev/zacsweers/metro/Provider;Ldev/zacsweers/metro/Provider;)Ldev/carcara/perch/metro/DeepLinkBindings$ProvideDeepLinkManagerMetroFactory;
+	public final fun provideDeepLinkManager (Ldev/carcara/perch/DeepLinkNavigator;Ldev/carcara/perch/DeepLinkParser;Lkotlinx/coroutines/CoroutineScope;Ldev/carcara/perch/DeepLinkAuthGate;Ldev/carcara/perch/DeepLinkLockGate;Ljava/util/Map;Lkotlinx/coroutines/CoroutineDispatcher;)Ldev/carcara/perch/DeepLinkManager;
+}
+
+public abstract interface class dev/carcara/perch/metro/DeepLinkRouteHandlerMapAccessor {
+	public abstract fun getDeepLinkRouteHandlers ()Ljava/util/Map;
+}
+
+public abstract class dev/carcara/perch/metro/DeepLinkRouteHandlerMapAccessor$BindsMirror {
+	public final fun deepLinkRouteHandlers_property4205200196 ()Ljava/util/Map;
+}
+
+public abstract interface class dev/carcara/perch/metro/DeepLinkRouteHandlerMapAccessor$MetroContributionToAppScope : dev/carcara/perch/metro/DeepLinkRouteHandlerMapAccessor {
+}
+
+public abstract interface annotation class dev/carcara/perch/metro/DeepLinkRouteKey : java/lang/annotation/Annotation {
+	public abstract fun value ()Ljava/lang/Class;
+}
+
+public final class metro/hints/DevCarcaraPerchMetroDeepLinkBindingsDev_zacsweers_metro_AppScopeKt {
+	public static final synthetic fun dev_zacsweers_metro_AppScope (Ldev/carcara/perch/metro/DeepLinkBindings;)V
+}
+
+public final class metro/hints/DevCarcaraPerchMetroDeepLinkRouteHandlerMapAccessorDev_zacsweers_metro_AppScopeKt {
+	public static final synthetic fun dev_zacsweers_metro_AppScope (Ldev/carcara/perch/metro/DeepLinkRouteHandlerMapAccessor;)V
+}
+

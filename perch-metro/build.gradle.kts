@@ -3,6 +3,7 @@ plugins {
   alias(libs.plugins.androidKmpLibrary)
   alias(libs.plugins.metro)
   id("dev.carcara.perch.detekt")
+  id("dev.carcara.perch.publishing")
 }
 
 kotlin {

@@ -1,0 +1,29 @@
+public final class dev/carcara/perch/test/FakeDeepLinkAuthGate : dev/carcara/perch/DeepLinkAuthGate {
+	public fun <init> ()V
+	public fun isAuthenticated ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun setSuccess ()V
+}
+
+public final class dev/carcara/perch/test/FakeDeepLinkLockGate : dev/carcara/perch/DeepLinkLockGate {
+	public fun <init> ()V
+	public fun isUnlocked ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun unlock ()V
+}
+
+public final class dev/carcara/perch/test/RecordingDeepLinkNavigator : dev/carcara/perch/DeepLinkNavigator {
+	public fun <init> ()V
+	public fun currentTargetClass ()Lkotlin/reflect/KClass;
+	public final fun getLastNavigatedRoute ()Ldev/carcara/perch/DeepLinkTarget;
+	public final fun getLastPresentedRoute ()Ldev/carcara/perch/DeepLinkTarget;
+	public final fun getLastReplacedRoute ()Ldev/carcara/perch/DeepLinkTarget;
+	public final fun getLastSetRootRoute ()Ldev/carcara/perch/DeepLinkTarget;
+	public final fun getNavigateCallCount ()I
+	public final fun getPresentCallCount ()I
+	public final fun getReplaceCallCount ()I
+	public final fun getSetRootCallCount ()I
+	public fun present (Ldev/carcara/perch/DeepLinkTarget;)V
+	public fun push (Ldev/carcara/perch/DeepLinkTarget;)V
+	public fun replace (Ldev/carcara/perch/DeepLinkTarget;)V
+	public fun setRoot (Ldev/carcara/perch/DeepLinkTarget;)V
+}
+
