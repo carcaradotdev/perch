@@ -11,7 +11,7 @@ concurrency:
 
 jobs:
   build:
-    # The Apple targets (perch-core, perch-metro, perch-ksp's own consumers, the sample) only
+    # The Apple targets (perch-core, perch-ksp's own consumers, the sample) only
     # build on a macOS runner; there is no Linux fallback.
     runs-on: macos-15
     steps:
@@ -27,7 +27,7 @@ jobs:
       # Isolated Projects and the configuration cache are both on by default via
       # gradle.properties, so this inherits them without a flag. `build` depends on `check`,
       # which is where the real verification lives for this build:
-      #   - apiCheck (all four published modules) fails if an API dump is stale.
+      #   - apiCheck (both published modules) fails if an API dump is stale.
       #   - the per-source-set Detekt tasks (detektMetadataCommonMain, detektJvmMain, ...) lint
       #     every module's main source sets; test sources are not linted. The plain `detekt`
       #     lifecycle task Gradle also registers is NO-SOURCE on

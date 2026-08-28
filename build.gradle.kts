@@ -3,7 +3,6 @@ plugins {
   alias(libs.plugins.kotlinSerialization) apply false
   alias(libs.plugins.androidKmpLibrary) apply false
   alias(libs.plugins.ksp) apply false
-  alias(libs.plugins.metro) apply false
 }
 
 // Per-module group and version are set from `settings.gradle.kts`'s
