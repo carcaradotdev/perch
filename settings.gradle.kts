@@ -34,8 +34,6 @@ enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 rootProject.name = "perch"
 
 include(":perch-core")
-include(":perch-test")
-include(":perch-metro")
 include(":perch-ksp")
 
 // The sample is not published; it exists to run the whole KSP-and-aggregation pipeline. Naming

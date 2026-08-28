@@ -290,24 +290,16 @@ class DeepLinkParserSchemeHostTest {
 
 @Serializable
 @Resource("/payments/{id}")
-private class PaymentLink(val id: String) : DeepLinkTarget {
-  override val requiresAuth: Boolean get() = true
-}
+private class PaymentLink(val id: String) : DeepLinkTarget
 
 @Serializable
 @Resource("/pay.co/{id}")
-private class DottedLink(val id: String) : DeepLinkTarget {
-  override val requiresAuth: Boolean get() = true
-}
+private class DottedLink(val id: String) : DeepLinkTarget
 
 @Serializable
 @Resource("/search")
-private class SearchLink(val query: String) : DeepLinkTarget {
-  override val requiresAuth: Boolean get() = true
-}
+private class SearchLink(val query: String) : DeepLinkTarget
 
 @Serializable
 @Resource("/{tenant}/payments/{id}")
-private class TenantLink(val tenant: String, val id: String) : DeepLinkTarget {
-  override val requiresAuth: Boolean get() = true
-}
+private class TenantLink(val tenant: String, val id: String) : DeepLinkTarget

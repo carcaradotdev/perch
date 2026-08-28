@@ -467,9 +467,7 @@ class DeepLinkParserTest {
   }
 }
 
-abstract class TestDeepLinkTarget : DeepLinkTarget {
-  override val requiresAuth: Boolean = true
-}
+abstract class TestDeepLinkTarget : DeepLinkTarget
 
 // A serializable deep-link target with no @Resource — the shape a stale generated registration
 // produces when a route's @Resource is removed but its module's manifest still lists it.
