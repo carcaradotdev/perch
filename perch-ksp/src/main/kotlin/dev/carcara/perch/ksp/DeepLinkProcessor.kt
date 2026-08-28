@@ -105,8 +105,8 @@ internal class DeepLinkProcessor(
           // a COMPILATION_ERROR instead of an uncaught-exception INTERNAL_ERROR: KSP fails the
           // build once any error is logged, without needing the round to unwind via an exception.
           logger.error(
-            "Deep link collision detected! Path '$path' conflicts with '$existingPath' " +
-              "(registered by '$existingRoute'). New route: '$routeName'",
+            "Deep link collision detected. Pattern '$path' conflicts with '$existingPath', " +
+              "already registered by '$existingRoute', so '$routeName' cannot be registered.",
             classDecl,
           )
           return
@@ -141,13 +141,16 @@ internal class DeepLinkProcessor(
 
       val parserSimpleName = parserClass.substringAfterLast(".")
       writer.write("internal fun $parserSimpleName.registerDeepLinks() {\n")
-      routeClasses.sortedBy { it.qualifiedName?.asString() }.forEach { classDecl ->
-        writer.write("  register<${classDecl.qualifiedName?.asString()}>()\n")
+      // routeInfoList, not routeClasses: a class whose @Resource path could not be read was
+      // skipped above and has no manifest entry, so registering it here would emit a
+      // register<T>() the manifest does not know about.
+      routeInfoList.sortedBy { it.routeClassName }.forEach { route ->
+        writer.write("  register<${route.routeClassName}>()\n")
       }
       writer.write("}\n")
     }
 
-    logger.info("DeepLinkProcessor: generated registration for ${routeClasses.size} routes in $packageName")
+    logger.info("DeepLinkProcessor: generated registration for ${routeInfoList.size} routes in $packageName")
   }
 
   private fun generateManifestFile(packageName: String, routes: List<RouteInfo>) {
