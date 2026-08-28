@@ -8,8 +8,6 @@ import org.gradle.api.provider.Property
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 
-private const val KOTLIN_MULTIPLATFORM_ID = "org.jetbrains.kotlin.multiplatform"
-
 /**
  * Targets a module needs before Kotlin Multiplatform gives it a `commonMain` compilation, which is
  * the compilation the Perch processor runs on. Below this there is no `kspCommonMainKotlinMetadata`
@@ -119,10 +117,18 @@ public class PerchProducerPlugin : Plugin<Project> {
    * than the one that is misconfigured.
    */
   private fun requireCommonMainCompilation(project: Project) {
-    // The plugin id is checked as a string, and `KotlinMultiplatformExtension` is only touched
-    // afterwards. The Kotlin Gradle plugin is `compileOnly` here, so on a build where it was never
-    // applied that class is not loadable at all and naming it first would throw
-    // NoClassDefFoundError instead of the message below.
+    // Asking through `hasPlugin` rather than through `extensions.findByType` is what makes a named
+    // message possible: `getByType` below throws
+    // "Extension of type 'KotlinMultiplatformExtension' does not exist. Currently registered
+    // extension types: [...]" - a dump of every extension in the project, naming neither Perch nor
+    // the requirement. This is reached by a `kotlin("jvm")` module that applies KSP and Perch,
+    // which is an ordinary shape, not a contrived one.
+    //
+    // It is not protection against the Kotlin Gradle plugin being absent from the classpath. That
+    // failure is real (KGP is `compileOnly` here, so with no Kotlin plugin applied anywhere the
+    // class genuinely does not load) but it is unreachable: getting this far needs KSP, KSP needs
+    // a Kotlin plugin, and a Kotlin plugin is what puts the class on the classpath. A module with
+    // no Kotlin plugin at all fails on the KSP check above, several lines earlier.
     if (!project.pluginManager.hasPlugin(KOTLIN_MULTIPLATFORM_ID)) {
       throw GradleException(
         "dev.carcara.perch: Kotlin Multiplatform is not applied on ${project.path}. Perch scans " +

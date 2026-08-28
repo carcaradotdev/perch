@@ -161,6 +161,34 @@ class PerchProducerPluginTest {
     assertTrue(
       result.output.contains("dev.carcara.perch: Kotlin Multiplatform is not applied on :"),
     )
+    // What `hasPlugin` buys over letting `getByType` throw. Without the check the consumer gets a
+    // dump of every registered extension type, naming neither Perch nor the requirement.
+    assertFalse(result.output.contains("Currently registered extension types"))
+  }
+
+  @Test
+  fun `fails with a named message when no Kotlin plugin is applied at all`() {
+    file("settings.gradle.kts", settingsIncludingPerch())
+    file(
+      "build.gradle.kts",
+      """
+      plugins {
+        `java-library`
+        id("dev.carcara.perch")
+      }
+      perch { outputPackage.set("com.acme.home") }
+      """,
+    )
+
+    val result = runner("help").buildAndFail()
+
+    // The KSP check wins this race, and that is the right outcome: with no Kotlin plugin there is
+    // no KSP either, and "apply KSP" is the first thing this module is missing. Pinned because it
+    // is also what makes the Kotlin Multiplatform check below it unreachable without a Kotlin
+    // plugin on the classpath - the reason that check does not need to defend against the Kotlin
+    // Gradle plugin classes being absent.
+    assertTrue(result.output.contains("dev.carcara.perch: KSP is not configured on :"))
+    assertFalse(result.output.contains("NoClassDefFoundError"))
   }
 
   @Test

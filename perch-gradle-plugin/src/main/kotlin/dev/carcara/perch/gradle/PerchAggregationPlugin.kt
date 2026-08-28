@@ -10,8 +10,6 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinUsages
 
-private const val KOTLIN_MULTIPLATFORM_ID = "org.jetbrains.kotlin.multiplatform"
-
 /**
  * Source-set dependency buckets the aggregator resolves through. These are siblings:
  * `commonMainImplementation` does not extend `commonMainApi`, so a producer depended on with
