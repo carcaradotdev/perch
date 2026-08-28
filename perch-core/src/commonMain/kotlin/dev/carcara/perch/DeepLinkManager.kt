@@ -118,8 +118,8 @@ public class DeepLinkManager public constructor(
 
   // True only during the inner suspend window of a [DeepLinkRouteHandler].
   // The public [isProcessingDeepLink] also extends to handler-resolved targets
-  // still parked in [_pendingRoute] awaiting gates, so the splash gating
-  // covers the full deeplink-processing window, not just the handler call.
+  // still parked in [_pendingRoute] awaiting gates, so a consumer's cold-start
+  // loading state covers the full deeplink-processing window, not just the handler call.
   private val _handlerRunning = MutableStateFlow(false)
   override val isProcessingDeepLink: StateFlow<Boolean> =
     combine(_handlerRunning, _pendingRoute) { running, pending ->

@@ -409,7 +409,7 @@ class DeepLinkManagerTest {
     // Handler resolved but the resolved route is gated: nothing pushed yet.
     assertEquals(0, navigator.navigateCallCount)
     assertFalse(manager.bootstrapTakenOver.value)
-    // Splash gating must remain on through the post-handler wait.
+    // isProcessingDeepLink must remain true through the post-handler wait.
     assertTrue(manager.isProcessingDeepLink.value)
     // Public pendingRoute view reflects the resolved-but-waiting target.
     assertEquals(AuthRequiredRoute, manager.pendingRoute.value)

@@ -38,22 +38,27 @@ dependencyResolutionManagement {
 }
 ```
 
-Declare Perch's two Gradle plugins once, at the root, with `apply false`:
+Declare every Gradle plugin your modules will apply once, at the root, with `apply false` —
+including the Kotlin Gradle plugin itself:
 
 ```kotlin
 // build.gradle.kts (root)
 plugins {
+    kotlin("multiplatform") version "2.4.10" apply false
+    kotlin("plugin.serialization") version "2.4.10" apply false
+    id("com.google.devtools.ksp") version "2.3.10" apply false
     id("dev.carcara.perch") version "0.1.0-SNAPSHOT" apply false
     id("dev.carcara.perch.aggregation") version "0.1.0-SNAPSHOT" apply false
 }
 ```
 
-Do this even if only one module needs a plugin. A module that instead writes
-`id("org.jetbrains.kotlin.multiplatform") version "..."` on its own, alongside a Perch plugin,
-loads the Kotlin Gradle plugin into two classloaders; the Apple targets' shared build service then
-fails with a `SwiftPMLockTaskAggregationBuildService` cast exception that names neither Perch nor
-the real cause. Declaring the Kotlin Gradle plugin and both Perch plugins once at the root and
-`apply false` everywhere else avoids it.
+Do this even if only one module needs a given plugin. Two modules that each declare
+`id("org.jetbrains.kotlin.multiplatform") version "..."` independently — one applying a Perch
+plugin, one not — load the Kotlin Gradle plugin into two different classloaders, and the Apple
+targets' shared build service then fails with a `SwiftPMLockTaskAggregationBuildService` cast
+exception that names neither Perch nor the real cause. Declaring the Kotlin Gradle plugin and both
+Perch plugins once at the root and `apply false` everywhere else — so every module resolves the
+same plugin instance — avoids it.
 
 The library coordinates:
 
@@ -64,8 +69,10 @@ The library coordinates:
 | `dev.carcara.perch:perch-metro` | Metro DI bindings for `DeepLinkManager` |
 | `dev.carcara.perch:perch-ksp` | The KSP processor; referenced by Gradle plugin configuration, not by your code |
 
-All four are Kotlin Multiplatform (`perch-ksp` is JVM-only, since KSP processors run on the JVM),
-version `0.1.0-SNAPSHOT`.
+`perch-core`, `perch-test` and `perch-metro` are Kotlin Multiplatform. `perch-ksp` is a plain
+Kotlin/JVM module, not Multiplatform at all — KSP processors run on the JVM regardless of the
+targets of the module they process, so it does not need to be. All four are version
+`0.1.0-SNAPSHOT`.
 
 ## Quick start
 
@@ -75,14 +82,15 @@ snippets below are taken from it.
 ### 1. Declare a route
 
 In the module that owns your route definitions, apply Kotlin Multiplatform, KSP, kotlinx.serialization
-and Perch's producer plugin:
+and Perch's producer plugin (versions come from the root `build.gradle.kts` above, so none are
+repeated here):
 
 ```kotlin
 // my-routes/build.gradle.kts
 plugins {
     kotlin("multiplatform")
-    kotlin("plugin.serialization") version "2.4.10"
-    id("com.google.devtools.ksp") version "2.3.10"
+    kotlin("plugin.serialization")
+    id("com.google.devtools.ksp")
     id("dev.carcara.perch")
 }
 
@@ -100,6 +108,10 @@ kotlin {
 
 perch {
     outputPackage.set("com.example.routes")
+    // Required for now: the plugin's own default (`dev.carcara.perch:perch-ksp`, no version)
+    // does not resolve on its own against a published coordinate. Pin the version explicitly
+    // until that default carries one.
+    processorCoordinates.set("dev.carcara.perch:perch-ksp:0.1.0-SNAPSHOT")
 }
 ```
 
@@ -136,7 +148,7 @@ In the module that assembles your app, apply Perch's aggregation plugin instead:
 ```kotlin
 // app/build.gradle.kts
 plugins {
-    kotlin("multiplatform")
+    kotlin("multiplatform") // version from the root build.gradle.kts
     id("dev.carcara.perch.aggregation")
 }
 
@@ -196,23 +208,35 @@ when (val target = appParser().parse("myapp://payments/abc123")) {
 That already resolves a deep link into a typed route. For gated navigation — auth, an unlock
 screen, cold-start handling, custom async resolution before landing on a target — construct a
 `DeepLinkManager` instead of calling `parse` directly. It takes your own `DeepLinkNavigator`
-adapter over your app's real navigation stack; here it is wired against `perch-test`'s
-`RecordingDeepLinkNavigator` for illustration:
+adapter over your app's real navigation stack; a minimal one that only prints looks like this:
 
 ```kotlin
 import dev.carcara.perch.DeepLinkManager
-import dev.carcara.perch.test.RecordingDeepLinkNavigator
+import dev.carcara.perch.DeepLinkNavigator
+import dev.carcara.perch.DeepLinkTarget
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlin.reflect.KClass
+
+class PrintingNavigator : DeepLinkNavigator {
+    override fun push(target: DeepLinkTarget) = println("push $target")
+    override fun replace(target: DeepLinkTarget) = println("replace $target")
+    override fun setRoot(target: DeepLinkTarget) = println("setRoot $target")
+    override fun present(target: DeepLinkTarget) = println("present $target")
+    override fun currentTargetClass(): KClass<out DeepLinkTarget>? = null
+}
 
 val manager = DeepLinkManager(
-    navigator = RecordingDeepLinkNavigator(), // your app supplies a real DeepLinkNavigator
+    navigator = PrintingNavigator(), // your app supplies a real DeepLinkNavigator
     parser = appParser(),
     scope = CoroutineScope(Dispatchers.Main),
 )
 manager.setNavigationReady() // once your root navigation stack has been mounted
 manager.handleDeepLink("myapp://payments/abc123")
 ```
+
+(`perch-test`'s `RecordingDeepLinkNavigator` is a ready-made equivalent for your own tests — see
+the coordinates table above.)
 
 `DeepLinkManager` defaults `authGate` and `lockGate` to always-open, so a route with
 `requiresAuth = true` navigates immediately until you supply your own `DeepLinkAuthGate`/
