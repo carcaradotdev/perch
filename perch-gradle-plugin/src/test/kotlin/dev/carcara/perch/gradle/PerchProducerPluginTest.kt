@@ -3,6 +3,7 @@ package dev.carcara.perch.gradle
 import org.gradle.testkit.runner.GradleRunner
 import org.gradle.testkit.runner.TaskOutcome
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.rules.TemporaryFolder
@@ -108,6 +109,61 @@ class PerchProducerPluginTest {
   }
 
   @Test
+  fun `fails with a named message when the module declares a single target`() {
+    file("settings.gradle.kts", settingsIncludingPerch())
+    file("src/commonMain/kotlin/Sample.kt", "package com.acme.home\n\nclass Sample")
+    file(
+      "build.gradle.kts",
+      """
+      plugins {
+        id("org.jetbrains.kotlin.multiplatform") version "2.4.10"
+        id("com.google.devtools.ksp") version "2.3.10"
+        id("dev.carcara.perch")
+      }
+      kotlin { jvm() }
+      perch {
+        outputPackage.set("com.acme.home")
+        processorCoordinates.set("com.google.devtools.ksp:symbol-processing-api:2.3.10")
+      }
+      """,
+    )
+
+    // `help` rather than a real task: the point is that this fails during configuration, before
+    // Gradle ever goes looking for the `kspCommonMainKotlinMetadata` task that a single-target
+    // module never gets. Failing here is what makes the message reach the person, instead of
+    // Gradle's own "Task with name 'kspCommonMainKotlinMetadata' not found".
+    val result = runner("help").buildAndFail()
+
+    assertTrue(result.output.contains("dev.carcara.perch: :"))
+    assertTrue(result.output.contains("declares 1 Kotlin target (jvm)"))
+    assertTrue(result.output.contains("needs at least two"))
+    // The cryptic failure this guard replaces must not be what the consumer sees.
+    assertFalse(result.output.contains("Task with name 'kspCommonMainKotlinMetadata' not found"))
+  }
+
+  @Test
+  fun `fails with a named message when Kotlin Multiplatform is not applied`() {
+    file("settings.gradle.kts", settingsIncludingPerch())
+    file(
+      "build.gradle.kts",
+      """
+      plugins {
+        id("org.jetbrains.kotlin.jvm") version "2.4.10"
+        id("com.google.devtools.ksp") version "2.3.10"
+        id("dev.carcara.perch")
+      }
+      perch { outputPackage.set("com.acme.home") }
+      """,
+    )
+
+    val result = runner("help").buildAndFail()
+
+    assertTrue(
+      result.output.contains("dev.carcara.perch: Kotlin Multiplatform is not applied on :"),
+    )
+  }
+
+  @Test
   fun `registers a consumable manifest configuration`() {
     file("settings.gradle.kts", settingsIncludingPerch())
     file(
@@ -118,7 +174,11 @@ class PerchProducerPluginTest {
         id("com.google.devtools.ksp") version "2.3.10"
         id("dev.carcara.perch")
       }
-      kotlin { jvm() }
+      // Two targets, because Perch requires them: one target gets no commonMain compilation.
+      kotlin {
+        jvm()
+        linuxX64()
+      }
       perch { outputPackage.set("com.acme.home") }
 
       tasks.register("printConfig") {

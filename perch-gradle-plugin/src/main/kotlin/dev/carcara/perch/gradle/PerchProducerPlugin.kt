@@ -5,6 +5,17 @@ import org.gradle.api.GradleException
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.provider.Property
+import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
+import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
+
+private const val KOTLIN_MULTIPLATFORM_ID = "org.jetbrains.kotlin.multiplatform"
+
+/**
+ * Targets a module needs before Kotlin Multiplatform gives it a `commonMain` compilation, which is
+ * the compilation the Perch processor runs on. Below this there is no `kspCommonMainKotlinMetadata`
+ * task for the manifest artifact to be built by.
+ */
+private const val MINIMUM_TARGETS = 2
 
 public abstract class PerchExtension {
   /**
@@ -82,6 +93,10 @@ public class PerchProducerPlugin : Plugin<Project> {
 
     // afterEvaluate runs during configuration, before configuration-cache state is captured, so
     // closing over `project` here (unlike the two deferred lambdas above) is not a CC violation.
+    // It is also the earliest honest point for the target check below: targets are declared inside
+    // the `kotlin { }` block, so nothing can count them until the build script has finished
+    // running. Both checks throw during configuration, which is what puts the message in front of
+    // the person before Gradle goes looking for a task that was never created.
     project.afterEvaluate {
       if (!project.pluginManager.hasPlugin("com.google.devtools.ksp")) {
         throw GradleException(
@@ -89,6 +104,51 @@ public class PerchProducerPlugin : Plugin<Project> {
             "id(\"com.google.devtools.ksp\") before dev.carcara.perch.",
         )
       }
+      requireCommonMainCompilation(project)
     }
+  }
+
+  /**
+   * Perch reads routes out of `commonMain`, and Kotlin Multiplatform only creates the `commonMain`
+   * compilation - the one KSP registers `kspCommonMainKotlinMetadata` for, and the one this
+   * plugin's manifest artifact is built by - for a module declaring two or more targets.
+   *
+   * Without this, a single-target module configures cleanly and fails much later with Gradle's own
+   * `Task with name 'kspCommonMainKotlinMetadata' not found`, which names neither Perch, nor KSP,
+   * nor the requirement, and which is raised in whichever module is doing the aggregating rather
+   * than the one that is misconfigured.
+   */
+  private fun requireCommonMainCompilation(project: Project) {
+    // The plugin id is checked as a string, and `KotlinMultiplatformExtension` is only touched
+    // afterwards. The Kotlin Gradle plugin is `compileOnly` here, so on a build where it was never
+    // applied that class is not loadable at all and naming it first would throw
+    // NoClassDefFoundError instead of the message below.
+    if (!project.pluginManager.hasPlugin(KOTLIN_MULTIPLATFORM_ID)) {
+      throw GradleException(
+        "dev.carcara.perch: Kotlin Multiplatform is not applied on ${project.path}. Perch scans " +
+          "commonMain, which only a multiplatform module has. Apply " +
+          "id(\"$KOTLIN_MULTIPLATFORM_ID\") in the same `plugins { }` block.",
+      )
+    }
+
+    // The metadata target is filtered out: it is the commonMain compilation itself, not one of the
+    // targets whose existence creates it, so counting it would make every module look like it has
+    // one more target than its build script declares.
+    val targets = project.extensions.getByType(KotlinMultiplatformExtension::class.java)
+      .targets
+      .filter { it.platformType != KotlinPlatformType.common }
+      .map { it.name }
+      .sorted()
+    if (targets.size >= MINIMUM_TARGETS) return
+
+    throw GradleException(
+      "dev.carcara.perch: ${project.path} declares ${targets.size} Kotlin " +
+        "${if (targets.size == 1) "target" else "targets"} " +
+        "(${targets.joinToString().ifEmpty { "none" }}), and Perch needs at least two. Kotlin " +
+        "Multiplatform only gives a module a shared commonMain compilation once it has two or " +
+        "more targets, and that compilation is the one Perch's processor runs on - with a single " +
+        "target there is nothing for it to scan. Declare the other targets this module is built " +
+        "for, or move its routes into a module that has them.",
+    )
   }
 }
