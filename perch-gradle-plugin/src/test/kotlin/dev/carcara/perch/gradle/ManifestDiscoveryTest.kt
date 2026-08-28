@@ -7,6 +7,17 @@ import org.junit.rules.TemporaryFolder
 import org.junit.Test
 import java.io.File
 
+/**
+ * The spike that established manifests can be discovered through a consumer's own dependency graph.
+ *
+ * Its `perchManifests` declares no attributes, and that shape is **not** the one
+ * `PerchAggregationPlugin` ships. It resolves here only because both fixtures' producers are
+ * `java-library`. Point the same attribute-free request at a Kotlin Multiplatform producer and it
+ * stops working - outright for a native target, and only by accident for a JVM one, since such a
+ * module publishes eight or more variants with nothing to choose between them. That is why the
+ * plugin asks for the `commonMain` metadata attributes explicitly; read the comment on its
+ * `perchManifests` attributes block before simplifying it back to what is written below.
+ */
 class ManifestDiscoveryTest {
 
   @get:Rule val projectDir = TemporaryFolder()

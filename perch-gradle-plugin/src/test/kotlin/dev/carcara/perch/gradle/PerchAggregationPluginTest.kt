@@ -130,9 +130,12 @@ class PerchAggregationPluginTest {
     )
   }
 
+  // Not DeepLinkRegistration.kt: the KSP processor already writes a file of that name into a
+  // producer's own outputPackage, and a module that both declares a route and aggregates would end
+  // up with two of them in one package.
   private fun generated(): File = File(
     projectDir.root,
-    "app/build/generated/perch/commonMain/kotlin/com/acme/app/DeepLinkRegistration.kt",
+    "app/build/generated/perch/commonMain/kotlin/com/acme/app/PerchDeepLinkRegistration.kt",
   )
 
   // Every nested build runs with the configuration cache on, which is how every real consumer
@@ -243,6 +246,24 @@ class PerchAggregationPluginTest {
       result.output.contains("could not resolve 1 of this module's dependencies"),
     )
     assertTrue(result.output, result.output.contains("Could not resolve project ':unbuildable'"))
+  }
+
+  @Test
+  fun `names a manifest line it could not parse`() {
+    fixture("alpha", "app")
+    producer(
+      "alpha",
+      "/alpha|com.acme.alpha.AlphaLink|com.acme.alpha",
+      "this line has no fields at all",
+    )
+    consumer(implementation("alpha"))
+
+    val result = runner(":app:generateDeepLinkRegistration").build()
+
+    assertTrue(result.output, result.output.contains("ignored 1 manifest line(s)"))
+    assertTrue(result.output, result.output.contains("perch-manifest-alpha.txt:2"))
+    // The good line alongside the bad one still registers.
+    assertTrue(generated().readText().contains("register<com.acme.alpha.AlphaLink>()"))
   }
 
   @Test

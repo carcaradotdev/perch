@@ -52,14 +52,25 @@ public abstract class GenerateDeepLinkRegistration : DefaultTask() {
     val parserFqn = parserClass.get()
 
     val manifestFiles = manifests.files.sortedBy { it.invariantSeparatorsPath }
-    val routes = manifestFiles
-      .flatMap { it.readLines() }
-      .mapNotNull { line -> line.split('|').getOrNull(ROUTE_CLASS_FIELD)?.trim()?.ifEmpty { null } }
-      .distinct()
-      .sorted()
+    val routes = mutableListOf<String>()
+    val unparseable = mutableListOf<String>()
+    manifestFiles.forEach { file -> read(file, routes, unparseable) }
 
-    write(packageName, parserFqn, routes)
-    report(manifestFiles, routes, packageName)
+    val registered = routes.distinct().sorted()
+    write(packageName, parserFqn, registered)
+    report(manifestFiles, registered, unparseable, packageName)
+  }
+
+  private fun read(file: File, routes: MutableList<String>, unparseable: MutableList<String>) {
+    file.readLines().forEachIndexed { index, line ->
+      if (line.isBlank()) return@forEachIndexed
+      val routeClass = line.split('|').getOrNull(ROUTE_CLASS_FIELD).orEmpty().trim()
+      if (routeClass.isEmpty()) {
+        unparseable += "${file.name}:${index + 1}: $line"
+      } else {
+        routes += routeClass
+      }
+    }
   }
 
   private fun write(packageName: String, parserFqn: String, routes: List<String>) {
@@ -68,8 +79,12 @@ public abstract class GenerateDeepLinkRegistration : DefaultTask() {
     // `com.acme.b.Details`, and an aggregator that spans every module in an app makes that
     // ordinary rather than rare.
     val registrations = routes.joinToString("\n") { "  register<$it>()" }
+    // Not `DeepLinkRegistration.kt`: that is what the KSP processor writes into a producer's own
+    // outputPackage, and a module that both declares a route and aggregates - an app module with
+    // one route in it - would otherwise get two files of that name in one package and a
+    // duplicate-JVM-facade error naming neither Perch nor the reason.
     val outputFile = outputDirectory.get()
-      .file(packageName.replace('.', '/') + "/DeepLinkRegistration.kt")
+      .file(packageName.replace('.', '/') + "/PerchDeepLinkRegistration.kt")
       .asFile
     outputFile.parentFile.mkdirs()
     outputFile.writeText(
@@ -95,7 +110,21 @@ public abstract class GenerateDeepLinkRegistration : DefaultTask() {
    * that publishes no manifest at all produce the same empty result. Without this, the only symptom
    * of the first case is a deep link that never resolves at runtime, months later.
    */
-  private fun report(manifestFiles: List<File>, routes: List<String>, packageName: String) {
+  private fun report(
+    manifestFiles: List<File>,
+    routes: List<String>,
+    unparseable: List<String>,
+    packageName: String,
+  ) {
+    if (unparseable.isNotEmpty()) {
+      logger.warn(
+        "Perch: ignored ${unparseable.size} manifest line(s) that carry no route class in field " +
+          "${ROUTE_CLASS_FIELD + 1} of `path|routeClassName|outputPackage`. Any route they meant " +
+          "to declare is missing from $packageName.registerAllDeepLinks():\n" +
+          unparseable.joinToString("\n") { "  - $it" },
+      )
+    }
+
     val failures = resolutionFailures.getOrElse(emptyList())
     if (failures.isNotEmpty()) {
       logger.warn(

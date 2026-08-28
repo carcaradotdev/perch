@@ -3,17 +3,14 @@ package dev.carcara.perch.gradle
 import org.gradle.api.GradleException
 import org.gradle.api.Plugin
 import org.gradle.api.Project
-import org.gradle.api.attributes.Category
 import org.gradle.api.attributes.Usage
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.TaskProvider
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
+import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinUsages
 
 private const val KOTLIN_MULTIPLATFORM_ID = "org.jetbrains.kotlin.multiplatform"
-
-/** The usage the Kotlin Gradle plugin asks for when it resolves a `commonMain` dependency graph. */
-private const val KOTLIN_METADATA_USAGE = "kotlin-metadata"
 
 /**
  * Source-set dependency buckets the aggregator resolves through. These are siblings:
@@ -34,6 +31,12 @@ public abstract class PerchAggregationExtension {
  * Aggregator side of the Perch build pipeline. Collects the route manifest published by every
  * module reachable through this module's own dependencies and generates a single
  * `registerAllDeepLinks()` extension into `commonMain`.
+ *
+ * The graph it walks is this module's `commonMain` compile graph, so what it can discover is
+ * exactly what this module can compile against. A producer reachable only through another module's
+ * `implementation` bucket is not on that graph and contributes no routes - correctly, because its
+ * route types are not visible here either, and generating a `register<T>()` for one would not
+ * compile. Depend on such a module directly, or have the module between them use `api`.
  *
  * Discovery runs through the dependency graph rather than over `rootProject.subprojects`, so it
  * stays within the applying project and does not trip Isolated Projects.
@@ -81,11 +84,18 @@ public class PerchAggregationPlugin : Plugin<Project> {
       GRAPH_CONFIGURATIONS.forEach { extendsFrom(project.configurations.getByName(it)) }
       // Walking the graph needs an unambiguous request: a Kotlin Multiplatform module publishes
       // eight or more variants, and an attribute-free resolution can only choose between them by
-      // accident. Asking for what the Kotlin Gradle plugin itself asks for when it resolves
-      // commonMain means this sees exactly the graph commonMain compiles against, on every target.
+      // accident - it happens to work for a jvm() dependency and fails outright for an iOS one.
+      // These two are what the Kotlin Gradle plugin itself asks for when it resolves commonMain,
+      // minus its `category` and `jvm.environment`, both of which were measured to be redundant
+      // here: `usage` alone already separates metadataApiElements from the sources and
+      // documentation variants. So this sees exactly the graph commonMain compiles against, on
+      // every target, which is also the guarantee that every route it discovers is a type this
+      // module can actually name.
       attributes {
-        attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage::class.java, KOTLIN_METADATA_USAGE))
-        attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category::class.java, Category.LIBRARY))
+        attribute(
+          Usage.USAGE_ATTRIBUTE,
+          objects.named(Usage::class.java, KotlinUsages.KOTLIN_METADATA),
+        )
         attribute(KotlinPlatformType.attribute, KotlinPlatformType.common)
       }
     }
