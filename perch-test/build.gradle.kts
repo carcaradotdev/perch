@@ -24,7 +24,8 @@ kotlin {
   sourceSets {
     commonMain.dependencies {
       api(projects.perchCore)
-      implementation(libs.kotlinx.coroutines.core)
+      // `api`, not `implementation`: coroutines types are on this module's own public signatures.
+      api(libs.kotlinx.coroutines.core)
     }
   }
 }

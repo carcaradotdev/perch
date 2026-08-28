@@ -24,9 +24,17 @@ kotlin {
 
   sourceSets {
     commonMain.dependencies {
+      // Every one of these is `api` because every one of them is on a public signature here:
+      // ktor-resources' ResourcesFormat, kotlinx-serialization's KSerializer on `register`, and
+      // coroutines' StateFlow, CoroutineScope and CoroutineDispatcher across DeepLinkManager.
+      // Coroutines behind `implementation` compiled only because ktor-resources happens to
+      // api-expose it, which is a third party's choice to reverse at any time.
+      //
+      // kotlinx-serialization-core rather than -json: nothing here reads or writes JSON, and the
+      // json artifact sat on every consumer's runtime and native compile classpath for nothing.
       api(libs.ktor.resources)
-      implementation(libs.kotlinx.serialization.json)
-      implementation(libs.kotlinx.coroutines.core)
+      api(libs.kotlinx.serialization.core)
+      api(libs.kotlinx.coroutines.core)
     }
     commonTest.dependencies {
       implementation(libs.kotlin.test)
