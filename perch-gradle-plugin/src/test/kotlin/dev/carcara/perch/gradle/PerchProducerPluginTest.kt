@@ -14,6 +14,26 @@ class PerchProducerPluginTest {
 
   @get:Rule val projectDir = TemporaryFolder()
 
+  // The build script injects these so a Kotlin or KSP bump moves one number in the version
+  // catalogue rather than a dozen literals in here, which would otherwise keep passing against a
+  // toolchain nobody ships any more.
+  private val kotlinVersion: String =
+    checkNotNull(System.getProperty("perch.kotlinVersion")) {
+      "Run these tests through Gradle: the Kotlin Multiplatform fixtures need the catalog's Kotlin version."
+    }
+
+  private val kspVersion: String =
+    checkNotNull(System.getProperty("perch.kspVersion")) {
+      "Run these tests through Gradle: the fixtures resolve KSP with the catalog's version."
+    }
+
+  // What `perch.processorCoordinates` defaults to, so the assertion below pins the default against
+  // the version this plugin build actually publishes.
+  private val pluginVersion: String =
+    checkNotNull(System.getProperty("perch.pluginVersion")) {
+      "Run these tests through Gradle: the default processor coordinate carries this build's version."
+    }
+
   // PerchProducerPlugin reads KspExtension directly, and calls it while KSP is applied. A
   // fixture that exercises that path can't load `dev.carcara.perch` via GradleRunner's
   // withPluginClasspath(): that mechanism runs the plugin under test in a classloader
@@ -60,7 +80,7 @@ class PerchProducerPluginTest {
       "build.gradle.kts",
       """
       plugins {
-        id("org.jetbrains.kotlin.multiplatform") version "2.4.10"
+        id("org.jetbrains.kotlin.multiplatform") version "$kotlinVersion"
         id("dev.carcara.perch")
       }
       kotlin { jvm() }
@@ -83,8 +103,8 @@ class PerchProducerPluginTest {
       "build.gradle.kts",
       """
       plugins {
-        id("org.jetbrains.kotlin.multiplatform") version "2.4.10"
-        id("com.google.devtools.ksp") version "2.3.10"
+        id("org.jetbrains.kotlin.multiplatform") version "$kotlinVersion"
+        id("com.google.devtools.ksp") version "$kspVersion"
         id("dev.carcara.perch")
       }
       kotlin {
@@ -93,7 +113,7 @@ class PerchProducerPluginTest {
       }
       // The real processor isn't published; standing in with a resolvable artifact keeps
       // dependency resolution from masking the outputPackage failure this test targets.
-      perch { processorCoordinates.set("com.google.devtools.ksp:symbol-processing-api:2.3.10") }
+      perch { processorCoordinates.set("com.google.devtools.ksp:symbol-processing-api:$kspVersion") }
       """,
     )
 
@@ -116,14 +136,14 @@ class PerchProducerPluginTest {
       "build.gradle.kts",
       """
       plugins {
-        id("org.jetbrains.kotlin.multiplatform") version "2.4.10"
-        id("com.google.devtools.ksp") version "2.3.10"
+        id("org.jetbrains.kotlin.multiplatform") version "$kotlinVersion"
+        id("com.google.devtools.ksp") version "$kspVersion"
         id("dev.carcara.perch")
       }
       kotlin { jvm() }
       perch {
         outputPackage.set("com.acme.home")
-        processorCoordinates.set("com.google.devtools.ksp:symbol-processing-api:2.3.10")
+        processorCoordinates.set("com.google.devtools.ksp:symbol-processing-api:$kspVersion")
       }
       """,
     )
@@ -148,8 +168,8 @@ class PerchProducerPluginTest {
       "build.gradle.kts",
       """
       plugins {
-        id("org.jetbrains.kotlin.jvm") version "2.4.10"
-        id("com.google.devtools.ksp") version "2.3.10"
+        id("org.jetbrains.kotlin.jvm") version "$kotlinVersion"
+        id("com.google.devtools.ksp") version "$kspVersion"
         id("dev.carcara.perch")
       }
       perch { outputPackage.set("com.acme.home") }
@@ -198,8 +218,8 @@ class PerchProducerPluginTest {
       "build.gradle.kts",
       """
       plugins {
-        id("org.jetbrains.kotlin.multiplatform") version "2.4.10"
-        id("com.google.devtools.ksp") version "2.3.10"
+        id("org.jetbrains.kotlin.multiplatform") version "$kotlinVersion"
+        id("com.google.devtools.ksp") version "$kspVersion"
         id("dev.carcara.perch")
       }
       // Two targets, because Perch requires them: one target gets no commonMain compilation.
@@ -232,8 +252,8 @@ class PerchProducerPluginTest {
       import org.gradle.api.artifacts.ProjectDependency
 
       plugins {
-        id("org.jetbrains.kotlin.multiplatform") version "2.4.10"
-        id("com.google.devtools.ksp") version "2.3.10"
+        id("org.jetbrains.kotlin.multiplatform") version "$kotlinVersion"
+        id("com.google.devtools.ksp") version "$kspVersion"
         id("dev.carcara.perch")
       }
       kotlin {
@@ -261,5 +281,39 @@ class PerchProducerPluginTest {
     val result = runner("printProcessorDependency", "--configuration-cache").build()
 
     assertTrue(result.output.contains("PROJECT_DEPENDENCY=true"))
+  }
+
+  @Test
+  fun `the default processor coordinate carries this build's version`() {
+    file("settings.gradle.kts", settingsIncludingPerch())
+    file(
+      "build.gradle.kts",
+      """
+      plugins {
+        id("org.jetbrains.kotlin.multiplatform") version "$kotlinVersion"
+        id("com.google.devtools.ksp") version "$kspVersion"
+        id("dev.carcara.perch")
+      }
+      kotlin {
+        jvm()
+        linuxX64()
+      }
+      // No `processorCoordinates` line: the default is the thing under test.
+      perch { outputPackage.set("com.acme.home") }
+
+      tasks.register("printProcessorCoordinate") {
+        val coordinates = configurations.getByName("kspCommonMainMetadata").dependencies
+          .map { "${'$'}{it.group}:${'$'}{it.name}:${'$'}{it.version}" }
+        doLast { coordinates.forEach { println("PROCESSOR=${'$'}it") } }
+      }
+      """,
+    )
+
+    val result = runner("printProcessorCoordinate", "--configuration-cache").build()
+
+    // A coordinate with no version resolves against nothing, and fails with a message naming
+    // neither Perch nor `perch.processorCoordinates`. The version is generated into the plugin jar
+    // rather than left to every consumer to pin.
+    assertTrue(result.output.contains("PROCESSOR=dev.carcara.perch:perch-ksp:$pluginVersion"))
   }
 }

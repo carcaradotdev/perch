@@ -29,7 +29,8 @@ jobs:
       # which is where the real verification lives for this build:
       #   - apiCheck (all four published modules) fails if an API dump is stale.
       #   - the per-source-set Detekt tasks (detektMetadataCommonMain, detektJvmMain, ...) lint
-      #     every module. The plain `detekt` lifecycle task Gradle also registers is NO-SOURCE on
+      #     every module's main source sets; test sources are not linted. The plain `detekt`
+      #     lifecycle task Gradle also registers is NO-SOURCE on
       #     a Kotlin Multiplatform module and would silently check nothing if invoked on its own
       #     - confirmed locally with `./gradlew :perch-core:detekt` - so it is deliberately not
       #     invoked here; `settings.gradle.kts` already fails the build if a module opts out of
@@ -48,9 +49,10 @@ jobs:
       - name: Build and test the Gradle plugin build
         run: ./gradlew -p perch-gradle-plugin build --no-configuration-cache
 
-      # build-logic is the third Gradle build (also `pluginManagement.includeBuild`, from both
-      # the root and perch-gradle-plugin). It holds the precompiled convention plugins
-      # (dev.carcara.perch.detekt, dev.carcara.perch.publishing) that the other two builds apply.
+      # build-logic is the third Gradle build, included by the root build's
+      # `pluginManagement.includeBuild` and by that build alone. It holds the precompiled
+      # convention plugins (dev.carcara.perch.detekt, dev.carcara.perch.publishing) that the root
+      # build's modules apply; perch-gradle-plugin applies neither and includes nothing.
       # It has no unit tests of its own (`test` is NO-SOURCE), but `build` still compiles the
       # convention plugin scripts and runs `validatePlugins` against them, so a broken convention
       # plugin fails here instead of surfacing as a confusing failure in whichever module applies

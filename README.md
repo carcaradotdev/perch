@@ -67,7 +67,7 @@ The library coordinates:
 | `dev.carcara.perch:perch-core` | `DeepLinkParser`, `DeepLinkManager`, `DeepLinkTarget`, gates, navigator interface |
 | `dev.carcara.perch:perch-test` | Test fakes: `RecordingDeepLinkNavigator`, `FakeDeepLinkAuthGate`, `FakeDeepLinkLockGate` |
 | `dev.carcara.perch:perch-metro` | Metro DI bindings for `DeepLinkManager` |
-| `dev.carcara.perch:perch-ksp` | The KSP processor; referenced by Gradle plugin configuration, not by your code |
+| `dev.carcara.perch:perch-ksp` | The KSP processor; `dev.carcara.perch` adds it for you, so nothing in your build names it |
 
 `perch-core`, `perch-test` and `perch-metro` are Kotlin Multiplatform. `perch-ksp` is a plain
 Kotlin/JVM module, not Multiplatform at all — KSP processors run on the JVM regardless of the
@@ -108,10 +108,6 @@ kotlin {
 
 perch {
     outputPackage.set("com.example.routes")
-    // Required for now: the plugin's own default (`dev.carcara.perch:perch-ksp`, no version)
-    // does not resolve on its own against a published coordinate. Pin the version explicitly
-    // until that default carries one.
-    processorCoordinates.set("dev.carcara.perch:perch-ksp:0.1.0-SNAPSHOT")
 }
 ```
 
@@ -248,8 +244,11 @@ cold-start/warm-start distinction.
 Two Gradle plugins, applied to different modules:
 
 - **`dev.carcara.perch`** — the *producer* plugin. Apply it to a module that declares routes. It
-  runs the Perch KSP processor over that module's own `commonMain` sources and publishes the
-  routes it finds on a `perchManifestElements` configuration, for an aggregator to pick up.
+  runs the Perch KSP processor over that module's own `commonMain` sources, publishes the routes
+  it finds on a `perchManifestElements` configuration for an aggregator to pick up, and generates
+  an `internal fun DeepLinkParser.registerDeepLinks()` into that module's `commonMain`. A
+  single-module app needs no aggregator at all: apply this plugin, and call `registerDeepLinks()`
+  on your own parser.
 - **`dev.carcara.perch.aggregation`** — the *aggregator* plugin. Apply it to the module that
   assembles your app (or any module that wants a single `registerAllDeepLinks()` covering several
   producers). It walks this module's own `commonMain` dependency graph, collects every manifest it
@@ -355,10 +354,10 @@ root build's task graph:
 ```
 
 `./gradlew build` runs `check`, which runs `apiCheck` for every published module and detekt over
-every Kotlin source set — fails if you've broken binary compatibility without running `apiDump`,
-or introduced a lint violation. It also builds and tests `sample/`, which exercises the whole KSP
-and aggregation pipeline end to end; if a change to either plugin breaks the pipeline, the sample
-is what notices.
+every main source set — fails if you've broken binary compatibility without running `apiDump`, or
+introduced a lint violation. Test sources are not linted. It also builds and tests `sample/`,
+which exercises the whole KSP and aggregation pipeline end to end; if a change to either plugin
+breaks the pipeline, the sample is what notices.
 
 CI (`.github/workflows/ci.yml`) runs all three commands above on every pull request, on `macos-15`
 — the Apple targets do not build on other runner images.

@@ -22,12 +22,15 @@ kotlin {
     commonMain.dependencies {
       api(projects.perchCore)
     }
+    commonTest.dependencies {
+      implementation(libs.kotlin.test)
+    }
   }
 }
 
 perch {
   outputPackage.set("com.example.sample.routes")
-  // A project path rather than the `dev.carcara.perch:perch-ksp` convention, because the
-  // processor lives in this build. A consumer outside this repository leaves it alone.
+  // A project path rather than the `dev.carcara.perch:perch-ksp:<version>` convention, because
+  // the processor lives in this build. A consumer outside this repository leaves it alone.
   processorCoordinates.set(projects.perchKsp.path)
 }

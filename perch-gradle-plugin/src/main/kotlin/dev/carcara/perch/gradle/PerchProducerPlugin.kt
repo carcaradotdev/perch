@@ -7,6 +7,7 @@ import org.gradle.api.Project
 import org.gradle.api.provider.Property
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
 
 /**
  * Targets a module needs before Kotlin Multiplatform gives it a `commonMain` compilation, which is
@@ -23,8 +24,11 @@ public abstract class PerchExtension {
   public abstract val outputPackage: Property<String>
 
   /**
-   * Coordinates of the KSP processor: a Maven coordinate (`"group:artifact"`) or, for a build
-   * that carries the processor as an included project, a project path (`":perch-ksp"`).
+   * Coordinates of the KSP processor: a Maven coordinate (`"group:artifact:version"`) or, for a
+   * build that carries the processor as an included project, a project path (`":perch-ksp"`).
+   *
+   * Defaults to the `perch-ksp` artifact published from the same version as this plugin, so a
+   * consumer only sets this to point at a processor somewhere else.
    */
   public abstract val processorCoordinates: Property<String>
 
@@ -46,7 +50,7 @@ public abstract class PerchExtension {
 public class PerchProducerPlugin : Plugin<Project> {
   override fun apply(project: Project) {
     val extension = project.extensions.create("perch", PerchExtension::class.java)
-    extension.processorCoordinates.convention("dev.carcara.perch:perch-ksp")
+    extension.processorCoordinates.convention("dev.carcara.perch:perch-ksp:${PerchVersion.value}")
     extension.targetBaseClass.convention("dev.carcara.perch.DeepLinkTarget")
     extension.parserClass.convention("dev.carcara.perch.DeepLinkParser")
 
@@ -55,7 +59,7 @@ public class PerchProducerPlugin : Plugin<Project> {
     val kspManifestsDir = project.layout.buildDirectory.dir("generated/ksp/metadata/commonMain/resources")
     project.configurations.consumable("perchManifestElements") {
       attributes { attribute(PERCH_MANIFEST_ATTRIBUTE, "true") }
-      outgoing.artifact(kspManifestsDir) { builtBy("kspCommonMainKotlinMetadata") }
+      outgoing.artifact(kspManifestsDir) { builtBy(KSP_METADATA_TASK) }
     }
 
     // `dependencies.addLater` defers this lambda to execution time, so it must not close over
@@ -89,6 +93,8 @@ public class PerchProducerPlugin : Plugin<Project> {
       ksp.arg("perch.parserClass", extension.parserClass)
     }
 
+    project.plugins.withId(KOTLIN_MULTIPLATFORM_ID) { compileGeneratedRegistration(project) }
+
     // afterEvaluate runs during configuration, before configuration-cache state is captured, so
     // closing over `project` here (unlike the two deferred lambdas above) is not a CC violation.
     // It is also the earliest honest point for the target check below: targets are declared inside
@@ -104,6 +110,48 @@ public class PerchProducerPlugin : Plugin<Project> {
       }
       requireCommonMainCompilation(project)
     }
+  }
+
+  /**
+   * Puts the processor's generated Kotlin on the module's own compile path, so the module can call
+   * the `registerDeepLinks()` it generates.
+   *
+   * Without this the module publishes a manifest for an aggregator and nothing else: the generated
+   * file is written but no source set holds it and no compile task waits for it, which leaves the
+   * single-module case - routes and a parser in one module, no aggregator anywhere - with a
+   * function it cannot call.
+   *
+   * Unlike `dev.carcara.perch.aggregation`, which hands its generator's `TaskProvider` straight to
+   * `srcDir` and lets every consumer inherit the dependency, this adds the directory by *path* and
+   * wires the ordering separately. A `srcDir` carrying a `builtBy` is a directory the KSP metadata
+   * task itself must wait for, since that task compiles `commonMain`, and Gradle rejects the
+   * result outright: "Circular dependency between the following tasks:
+   * kspCommonMainKotlinMetadata \--- kspCommonMainKotlinMetadata".
+   *
+   * So each consumer is named instead. The Kotlin compilations are the ones that matter; the
+   * others read the directory without compiling it and fail validation rather than produce a wrong
+   * answer ("uses this output of task ... without declaring an explicit or implicit dependency").
+   * Detekt and the sources jars are matched by name because neither type is on this plugin's
+   * classpath, and both are absent unless the module opts into them.
+   *
+   * Applying `dev.carcara.perch.aggregation` to the same module stays fine: that plugin generates
+   * a differently named `registerAllDeepLinks()` into a directory of its own.
+   */
+  private fun compileGeneratedRegistration(project: Project) {
+    val generatedSources =
+      project.layout.buildDirectory.dir("generated/ksp/metadata/commonMain/kotlin")
+
+    project.extensions.getByType(KotlinMultiplatformExtension::class.java)
+      .sourceSets
+      .configureEach { if (name == "commonMain") kotlin.srcDir(generatedSources) }
+
+    project.tasks.withType(KotlinCompilationTask::class.java).configureEach {
+      if (name != KSP_METADATA_TASK) dependsOn(KSP_METADATA_TASK)
+    }
+
+    project.tasks
+      .matching { it.name.startsWith("detekt") || it.name.endsWith("sourcesJar", ignoreCase = true) }
+      .configureEach { dependsOn(KSP_METADATA_TASK) }
   }
 
   /**
