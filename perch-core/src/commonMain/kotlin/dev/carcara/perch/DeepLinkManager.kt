@@ -26,6 +26,17 @@ import kotlin.reflect.KClass
  *
  * Exposed separately from [DeepLinkManager] so a consumer's cold-start logic can depend on this
  * narrow surface instead of the full constructor.
+ *
+ * ## Both members cover the handler path only
+ *
+ * Neither flow says anything about a deep link with no [DeepLinkRouteHandler] registered for its
+ * target type — which is the majority case. Such a link parks in [DeepLinkManager.pendingRoute]
+ * with [isProcessingDeepLink] reporting `false`, and navigates with [bootstrapTakenOver] still
+ * `false`. **A consumer that wants the general cold-start signal must observe
+ * `DeepLinkManager.pendingRoute != null` as well as these two**: gate a loading screen on
+ * `isProcessingDeepLink || pendingRoute != null`, and suppress an initial destination on
+ * `bootstrapTakenOver || pendingRoute != null`. Acting on these two alone flashes past the wait
+ * for a handler-free link and then overwrites its destination.
  */
 public interface DeepLinkBootstrapState {
   /**
@@ -34,7 +45,8 @@ public interface DeepLinkBootstrapState {
    *
    * A consumer that shows a loading screen on cold start should keep it up for as long as
    * this stays true, so the covered window spans both the handler call and any post-handler
-   * gate wait.
+   * gate wait. It stays `false` throughout for a target with no registered handler — see the
+   * interface KDoc for what to observe alongside it.
    */
   public val isProcessingDeepLink: StateFlow<Boolean>
 
@@ -42,7 +54,8 @@ public interface DeepLinkBootstrapState {
    * True once [DeepLinkManager] has navigated for a handler-driven deep link.
    *
    * A consumer that also sets an initial destination on cold start must not do so once this
-   * flips true, or it will overwrite the deep-link destination.
+   * flips true, or it will overwrite the deep-link destination. It stays `false` throughout for a
+   * target with no registered handler — see the interface KDoc for what to observe alongside it.
    */
   public val bootstrapTakenOver: StateFlow<Boolean>
 }

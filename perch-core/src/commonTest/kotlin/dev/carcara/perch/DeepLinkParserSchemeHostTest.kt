@@ -92,10 +92,31 @@ class DeepLinkParserSchemeHostTest {
   }
 
   @Test
-  fun `toUrl uses the first configured scheme`() {
+  fun `toUrl uses the first custom scheme`() {
     val subject = DeepLinkParser(schemes = setOf("acme", "https"), hosts = setOf("acme.com"))
 
     assertEquals("acme://payments/abc123", subject.toUrl(PaymentLink("abc123")))
+  }
+
+  @Test
+  fun `toUrl prefers a custom scheme over a hierarchical one listed first`() {
+    // One edit away from the README's own `setOf("myapp", "https")`. Emitting `schemes.first()`
+    // here would produce `https://payments/abc123`, putting the route's first path element in the
+    // host position, and the same parser would then refuse to parse it back.
+    val subject = DeepLinkParser(schemes = setOf("https", "acme"), hosts = setOf("acme.com"))
+      .apply { register<PaymentLink>() }
+
+    assertEquals("acme://payments/abc123", subject.toUrl(PaymentLink("abc123")))
+    assertIs<PaymentLink>(subject.parse(subject.toUrl(PaymentLink("abc123"))))
+  }
+
+  @Test
+  fun `toUrl emits a host when every configured scheme is hierarchical`() {
+    val subject = DeepLinkParser(schemes = setOf("https"), hosts = setOf("acme.com"))
+      .apply { register<PaymentLink>() }
+
+    assertEquals("https://acme.com/payments/abc123", subject.toUrl(PaymentLink("abc123")))
+    assertIs<PaymentLink>(subject.parse(subject.toUrl(PaymentLink("abc123"))))
   }
 
   @Test

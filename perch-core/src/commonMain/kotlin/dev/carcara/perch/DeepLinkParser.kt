@@ -34,7 +34,9 @@ import kotlinx.serialization.serializer
  * schemes are unaffected: for them [hosts] is meaningless and may stay empty.
  *
  * A fragment is discarded, in every scheme, before the path and query are read. Surrounding
- * whitespace is trimmed. Nothing is percent-decoded.
+ * whitespace is trimmed. Nothing is percent-decoded, and the path is not normalised: `.` and `..`
+ * are ordinary segments here, so a `{param...}` tailcard route receives them verbatim rather than
+ * having them resolved away.
  *
  * ```kotlin
  * val parser = DeepLinkParser(schemes = setOf("acme", "https"), hosts = setOf("acme.com"))
@@ -72,11 +74,12 @@ public class DeepLinkParser(
   }
 
   /**
-   * Scheme [toUrl] emits, which is the first entry of [schemes]. `@PublishedApi internal`
+   * What [toUrl] puts in front of the encoded path: `"<scheme>:/"` for a custom scheme, or
+   * `"https://<host>"` when every configured scheme is hierarchical. `@PublishedApi internal`
    * rather than private: [toUrl] is inline with a reified type, so it cannot read a private member.
    */
   @PublishedApi
-  internal val canonicalScheme: String = this.schemes.first()
+  internal val urlPrefix: String = buildUrlPrefix(this.schemes, this.hosts)
 
   @PublishedApi
   internal val format: ResourcesFormat = ResourcesFormat()
@@ -128,10 +131,35 @@ public class DeepLinkParser(
     return null
   }
 
+  /**
+   * Builds the URL for [deepLink].
+   *
+   * The scheme is the first *custom* (non-`http`, non-`https`) entry of `schemes`, whatever order
+   * `schemes` was given in. Only a custom scheme puts a route's first path element straight after
+   * `://`; a hierarchical one puts a host there. When every configured scheme is hierarchical the
+   * URL is emitted as `https://<first host>/...` instead, against the first entry of `hosts`.
+   * Either way the result parses back through [parse].
+   */
   public inline fun <reified T : DeepLinkTarget> toUrl(deepLink: T): String {
     val path = href(format, deepLink)
-    return "$canonicalScheme:/$path"
+    return "$urlPrefix$path"
   }
+}
+
+/**
+ * Prefix `toUrl` emits ahead of the encoded path, which always starts with `/`.
+ *
+ * A custom scheme wins over `http`/`https` regardless of iteration order, and iteration order is
+ * the point: `schemes` is a `Set` the consumer supplies, whose order is not part of `Set`'s
+ * contract. Emitting the first entry blindly turns `setOf("https", "myapp")` into
+ * `https://payments/abc`, which names `payments` as the host and does not parse back. Only when
+ * every configured scheme is hierarchical is one emitted, and then with a real host in the host
+ * position — `hosts` is non-empty in that case, because the constructor requires it.
+ */
+private fun buildUrlPrefix(schemes: Set<String>, hosts: Set<String>): String {
+  val customScheme = schemes.firstOrNull { it !in HIERARCHICAL_SCHEMES }
+  if (customScheme != null) return "$customScheme:/"
+  return "${schemes.first()}://${hosts.first()}"
 }
 
 /** Thrown when two routes register path patterns that could match the same URL. */
@@ -140,6 +168,6 @@ public class DeepLinkCollisionException(
   public val existingRoute: String,
   public val newRoute: String,
 ) : IllegalStateException(
-  "Deep link collision detected. Pattern '$pattern' is already registered by '$existingRoute', " +
-    "so '$newRoute' cannot register the same pattern.",
+  "Deep link collision detected. Pattern '$pattern' conflicts with a pattern already registered " +
+    "by '$existingRoute', so '$newRoute' cannot be registered.",
 )

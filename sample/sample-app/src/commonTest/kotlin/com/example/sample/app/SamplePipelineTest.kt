@@ -68,7 +68,7 @@ class SamplePipelineTest {
     assertTrue(manager.handleDeepLink("sample://home"))
     advanceUntilIdle()
 
-    assertIs<HomeLink>(navigator.lastNavigatedRoute)
-    assertEquals(1, navigator.navigateCallCount)
+    assertIs<HomeLink>(navigator.lastPushedRoute)
+    assertEquals(1, navigator.pushCallCount)
   }
 }

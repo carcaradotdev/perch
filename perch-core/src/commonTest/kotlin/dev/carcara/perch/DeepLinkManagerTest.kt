@@ -26,8 +26,8 @@ import kotlin.test.assertTrue
 class DeepLinkManagerTest {
 
   private lateinit var navigator: RecordingDeepLinkNavigator
-  private lateinit var tokenProvider: FakeDeepLinkAuthGate
-  private lateinit var appLockManager: FakeDeepLinkLockGate
+  private lateinit var authGate: FakeDeepLinkAuthGate
+  private lateinit var lockGate: FakeDeepLinkLockGate
 
   @BeforeTest
   fun setUp() {
@@ -35,8 +35,8 @@ class DeepLinkManagerTest {
     // dispatcher in tests, so route it to the test scheduler.
     Dispatchers.setMain(UnconfinedTestDispatcher())
     navigator = RecordingDeepLinkNavigator()
-    tokenProvider = FakeDeepLinkAuthGate()
-    appLockManager = FakeDeepLinkLockGate()
+    authGate = FakeDeepLinkAuthGate()
+    lockGate = FakeDeepLinkLockGate()
   }
 
   @AfterTest
@@ -53,8 +53,8 @@ class DeepLinkManagerTest {
     return DeepLinkManager(
       navigator = navigator,
       parser = DeepLinkParser(schemes = setOf("acme")),
-      authGate = tokenProvider,
-      lockGate = appLockManager,
+      authGate = authGate,
+      lockGate = lockGate,
       routeHandlers = handlers,
       scope = CoroutineScope(backgroundScope.coroutineContext + testDispatcher),
       handlerDispatcher = testDispatcher,
@@ -63,79 +63,79 @@ class DeepLinkManagerTest {
   }
 
   @Test
-  fun `auth-required route navigates immediately when token success and unlocked`() = runTest {
-    tokenProvider.setSuccess()
-    appLockManager.unlock()
+  fun `auth-required route navigates immediately when authenticated and unlocked`() = runTest {
+    authGate.authenticate()
+    lockGate.unlock()
 
     val manager = createManager()
     manager.handleRoute(AuthRequiredRoute)
     advanceUntilIdle()
 
-    assertEquals(AuthRequiredRoute, navigator.lastNavigatedRoute)
-    assertEquals(1, navigator.navigateCallCount)
+    assertEquals(AuthRequiredRoute, navigator.lastPushedRoute)
+    assertEquals(1, navigator.pushCallCount)
     assertNull(manager.pendingRoute.value)
   }
 
   @Test
-  fun `auth-required route is queued when token success but app is locked`() = runTest {
-    tokenProvider.setSuccess()
-    // AppLockManager defaults to locked.
+  fun `auth-required route is queued when authenticated but the app is locked`() = runTest {
+    authGate.authenticate()
+    // The lock gate defaults to locked.
 
     val manager = createManager()
     manager.handleRoute(AuthRequiredRoute)
     advanceUntilIdle()
 
-    assertEquals(0, navigator.navigateCallCount)
+    assertEquals(0, navigator.pushCallCount)
     assertEquals(AuthRequiredRoute, manager.pendingRoute.value)
   }
 
   @Test
-  fun `auth-required route is queued when token error even if unlocked`() = runTest {
-    appLockManager.unlock()
-    // TokenProvider defaults to no token.
+  fun `auth-required route is queued when unauthenticated even if unlocked`() = runTest {
+    lockGate.unlock()
+    // The auth gate defaults to signed out.
 
     val manager = createManager()
     manager.handleRoute(AuthRequiredRoute)
     advanceUntilIdle()
 
-    assertEquals(0, navigator.navigateCallCount)
+    assertEquals(0, navigator.pushCallCount)
     assertEquals(AuthRequiredRoute, manager.pendingRoute.value)
   }
 
   @Test
-  fun `pending route navigates after token success and unlock both happen`() = runTest {
+  fun `pending route navigates after authentication and unlock both happen`() = runTest {
     val manager = createManager()
     manager.handleRoute(AuthRequiredRoute)
     advanceUntilIdle()
-    assertEquals(0, navigator.navigateCallCount)
+    assertEquals(0, navigator.pushCallCount)
 
-    tokenProvider.setSuccess()
+    authGate.authenticate()
     advanceUntilIdle()
-    // Token is now valid but lock is still down, so it must still wait.
-    assertEquals(0, navigator.navigateCallCount)
+    // Authenticated now, but the lock is still down, so it must still wait.
+    assertEquals(0, navigator.pushCallCount)
     assertEquals(AuthRequiredRoute, manager.pendingRoute.value)
 
-    appLockManager.unlock()
+    lockGate.unlock()
     advanceUntilIdle()
 
-    assertEquals(AuthRequiredRoute, navigator.lastNavigatedRoute)
-    assertEquals(1, navigator.navigateCallCount)
+    assertEquals(AuthRequiredRoute, navigator.lastPushedRoute)
+    assertEquals(1, navigator.pushCallCount)
     assertNull(manager.pendingRoute.value)
   }
 
   @Test
-  fun `pending route navigates after unlock happens before token when token arrives second`() = runTest {
+  fun `pending route navigates when unlock happens first and authentication second`() = runTest {
     val manager = createManager()
     manager.handleRoute(AuthRequiredRoute)
-    appLockManager.unlock()
+    lockGate.unlock()
     advanceUntilIdle()
-    assertEquals(0, navigator.navigateCallCount)
+    assertEquals(0, navigator.pushCallCount)
 
-    tokenProvider.setSuccess()
+    authGate.authenticate()
     advanceUntilIdle()
 
-    assertEquals(AuthRequiredRoute, navigator.lastNavigatedRoute)
-    assertEquals(1, navigator.navigateCallCount)
+    assertEquals(AuthRequiredRoute, navigator.lastPushedRoute)
+    assertEquals(1, navigator.pushCallCount)
   }
 
   @Test
@@ -144,8 +144,8 @@ class DeepLinkManagerTest {
     manager.handleRoute(NoAuthRoute)
     advanceUntilIdle()
 
-    assertEquals(NoAuthRoute, navigator.lastNavigatedRoute)
-    assertEquals(1, navigator.navigateCallCount)
+    assertEquals(NoAuthRoute, navigator.lastPushedRoute)
+    assertEquals(1, navigator.pushCallCount)
   }
 
   @Test
@@ -156,31 +156,31 @@ class DeepLinkManagerTest {
     assertEquals(AuthRequiredRoute, manager.pendingRoute.value)
 
     manager.clearPendingRoute()
-    tokenProvider.setSuccess()
-    appLockManager.unlock()
+    authGate.authenticate()
+    lockGate.unlock()
     advanceUntilIdle()
 
-    assertEquals(0, navigator.navigateCallCount)
+    assertEquals(0, navigator.pushCallCount)
     assertNull(manager.pendingRoute.value)
   }
 
   @Test
   fun `auth-required route is queued until host signals navigation ready`() = runTest {
-    tokenProvider.setSuccess()
-    appLockManager.unlock()
+    authGate.authenticate()
+    lockGate.unlock()
 
     val manager = createManager(navigationReady = false)
     manager.handleRoute(AuthRequiredRoute)
     advanceUntilIdle()
 
-    assertEquals(0, navigator.navigateCallCount)
+    assertEquals(0, navigator.pushCallCount)
     assertEquals(AuthRequiredRoute, manager.pendingRoute.value)
 
     manager.setNavigationReady()
     advanceUntilIdle()
 
-    assertEquals(AuthRequiredRoute, navigator.lastNavigatedRoute)
-    assertEquals(1, navigator.navigateCallCount)
+    assertEquals(AuthRequiredRoute, navigator.lastPushedRoute)
+    assertEquals(1, navigator.pushCallCount)
     assertNull(manager.pendingRoute.value)
   }
 
@@ -190,14 +190,14 @@ class DeepLinkManagerTest {
     manager.handleRoute(NoAuthRoute)
     advanceUntilIdle()
 
-    assertEquals(0, navigator.navigateCallCount)
+    assertEquals(0, navigator.pushCallCount)
     assertEquals(NoAuthRoute, manager.pendingRoute.value)
 
     manager.setNavigationReady()
     advanceUntilIdle()
 
-    assertEquals(NoAuthRoute, navigator.lastNavigatedRoute)
-    assertEquals(1, navigator.navigateCallCount)
+    assertEquals(NoAuthRoute, navigator.lastPushedRoute)
+    assertEquals(1, navigator.pushCallCount)
   }
 
   // --- Custom route handler tests ---
@@ -214,7 +214,7 @@ class DeepLinkManagerTest {
 
     assertEquals(NoAuthRoute, navigator.lastSetRootRoute)
     assertEquals(1, navigator.setRootCallCount)
-    assertEquals(0, navigator.navigateCallCount)
+    assertEquals(0, navigator.pushCallCount)
     assertFalse(manager.isProcessingDeepLink.value)
     assertTrue(manager.bootstrapTakenOver.value)
   }
@@ -229,8 +229,8 @@ class DeepLinkManagerTest {
     manager.handleRoute(HandlerRoute)
     advanceUntilIdle()
 
-    assertEquals(NoAuthRoute, navigator.lastNavigatedRoute)
-    assertEquals(1, navigator.navigateCallCount)
+    assertEquals(NoAuthRoute, navigator.lastPushedRoute)
+    assertEquals(1, navigator.pushCallCount)
     assertTrue(manager.bootstrapTakenOver.value)
   }
 
@@ -242,7 +242,7 @@ class DeepLinkManagerTest {
     manager.handleRoute(HandlerRoute)
     advanceUntilIdle()
 
-    assertEquals(0, navigator.navigateCallCount)
+    assertEquals(0, navigator.pushCallCount)
     assertEquals(0, navigator.setRootCallCount)
     assertFalse(manager.bootstrapTakenOver.value)
     assertFalse(manager.isProcessingDeepLink.value)
@@ -256,7 +256,7 @@ class DeepLinkManagerTest {
     manager.handleRoute(HandlerRoute)
     advanceUntilIdle()
 
-    assertEquals(0, navigator.navigateCallCount)
+    assertEquals(0, navigator.pushCallCount)
     assertFalse(manager.bootstrapTakenOver.value)
     assertFalse(manager.isProcessingDeepLink.value)
   }
@@ -292,18 +292,18 @@ class DeepLinkManagerTest {
     manager.handleRoute(HandlerRoute)
     advanceUntilIdle()
     assertTrue(manager.isProcessingDeepLink.value)
-    assertEquals(0, navigator.navigateCallCount)
+    assertEquals(0, navigator.pushCallCount)
 
     release.complete(Unit)
     advanceUntilIdle()
 
     assertFalse(manager.isProcessingDeepLink.value)
-    assertEquals(NoAuthRoute, navigator.lastNavigatedRoute)
+    assertEquals(NoAuthRoute, navigator.lastPushedRoute)
   }
 
   @Test
   fun `dedupe — handleRoute with same route while pending is ignored`() = runTest {
-    // No token, no unlock — gates closed, route stays pending.
+    // Not authenticated, not unlocked — gates closed, route stays pending.
     val manager = createManager()
     manager.handleRoute(AuthRequiredRoute)
     manager.handleRoute(AuthRequiredRoute)
@@ -311,11 +311,11 @@ class DeepLinkManagerTest {
     advanceUntilIdle()
 
     // Open gates once and assert single navigation.
-    tokenProvider.setSuccess()
-    appLockManager.unlock()
+    authGate.authenticate()
+    lockGate.unlock()
     advanceUntilIdle()
 
-    assertEquals(1, navigator.navigateCallCount)
+    assertEquals(1, navigator.pushCallCount)
   }
 
   @Test
@@ -342,7 +342,7 @@ class DeepLinkManagerTest {
     advanceUntilIdle()
 
     assertEquals(1, handlerInvocations)
-    assertEquals(1, navigator.navigateCallCount)
+    assertEquals(1, navigator.pushCallCount)
   }
 
   @Test
@@ -373,8 +373,8 @@ class DeepLinkManagerTest {
 
     // First handler was cancelled before completing; second handler ran to completion.
     assertFalse(firstResolved)
-    assertEquals(SecondNoAuthRoute, navigator.lastNavigatedRoute)
-    assertEquals(1, navigator.navigateCallCount)
+    assertEquals(SecondNoAuthRoute, navigator.lastPushedRoute)
+    assertEquals(1, navigator.pushCallCount)
   }
 
   @Test
@@ -393,10 +393,10 @@ class DeepLinkManagerTest {
 
   @Test
   fun `handler-resolved auth-required route waits for unlock before navigating`() = runTest {
-    // Token already valid but the app stays locked. Ingress (HandlerRoute) is
+    // Already authenticated but the app stays locked. Ingress (HandlerRoute) is
     // requiresAuth=false so the handler runs; the *resolved* target is AuthRequiredRoute,
     // which must wait on the lock just like a direct ingress would.
-    tokenProvider.setSuccess()
+    authGate.authenticate()
 
     val handler = DeepLinkRouteHandler<HandlerRoute> { _ ->
       DeepLinkResolution.Resolved(AuthRequiredRoute, NavigationMode.Push)
@@ -407,27 +407,27 @@ class DeepLinkManagerTest {
     advanceUntilIdle()
 
     // Handler resolved but the resolved route is gated: nothing pushed yet.
-    assertEquals(0, navigator.navigateCallCount)
+    assertEquals(0, navigator.pushCallCount)
     assertFalse(manager.bootstrapTakenOver.value)
     // isProcessingDeepLink must remain true through the post-handler wait.
     assertTrue(manager.isProcessingDeepLink.value)
     // Public pendingRoute view reflects the resolved-but-waiting target.
     assertEquals(AuthRequiredRoute, manager.pendingRoute.value)
 
-    appLockManager.unlock()
+    lockGate.unlock()
     advanceUntilIdle()
 
-    assertEquals(AuthRequiredRoute, navigator.lastNavigatedRoute)
-    assertEquals(1, navigator.navigateCallCount)
+    assertEquals(AuthRequiredRoute, navigator.lastPushedRoute)
+    assertEquals(1, navigator.pushCallCount)
     assertTrue(manager.bootstrapTakenOver.value)
     assertFalse(manager.isProcessingDeepLink.value)
     assertNull(manager.pendingRoute.value)
   }
 
   @Test
-  fun `handler-resolved route reaching auth-required target waits for token success`() = runTest {
-    // App already unlocked but no auth token yet. Symmetric to the lock case.
-    appLockManager.unlock()
+  fun `handler-resolved route reaching auth-required target waits for authentication`() = runTest {
+    // App already unlocked but not yet authenticated. Symmetric to the lock case.
+    lockGate.unlock()
 
     val handler = DeepLinkRouteHandler<HandlerRoute> { _ ->
       DeepLinkResolution.Resolved(AuthRequiredRoute, NavigationMode.SetRoot)
@@ -441,13 +441,56 @@ class DeepLinkManagerTest {
     assertFalse(manager.bootstrapTakenOver.value)
     assertTrue(manager.isProcessingDeepLink.value)
 
-    tokenProvider.setSuccess()
+    authGate.authenticate()
     advanceUntilIdle()
 
     assertEquals(AuthRequiredRoute, navigator.lastSetRootRoute)
     assertEquals(1, navigator.setRootCallCount)
     assertTrue(manager.bootstrapTakenOver.value)
     assertFalse(manager.isProcessingDeepLink.value)
+  }
+
+  // --- Same-type deep links replace the top of the stack rather than duplicating it ---
+
+  @Test
+  fun `deep link to the target type already on top replaces instead of pushing`() = runTest {
+    navigator.currentTarget = NoAuthRoute
+
+    val manager = createManager()
+    manager.handleRoute(NoAuthRoute)
+    advanceUntilIdle()
+
+    assertEquals(NoAuthRoute, navigator.lastReplacedRoute)
+    assertEquals(1, navigator.replaceCallCount)
+    assertEquals(0, navigator.pushCallCount)
+  }
+
+  @Test
+  fun `deep link to a different target type than the one on top pushes`() = runTest {
+    navigator.currentTarget = SecondNoAuthRoute
+
+    val manager = createManager()
+    manager.handleRoute(NoAuthRoute)
+    advanceUntilIdle()
+
+    assertEquals(NoAuthRoute, navigator.lastPushedRoute)
+    assertEquals(1, navigator.pushCallCount)
+    assertEquals(0, navigator.replaceCallCount)
+  }
+
+  @Test
+  fun `handler Replace mode invokes navigator replace`() = runTest {
+    val handler = DeepLinkRouteHandler<HandlerRoute> { _ ->
+      DeepLinkResolution.Resolved(NoAuthRoute, NavigationMode.Replace)
+    }
+    val manager = createManager(handlers = mapOf(HandlerRoute::class to handler))
+
+    manager.handleRoute(HandlerRoute)
+    advanceUntilIdle()
+
+    assertEquals(NoAuthRoute, navigator.lastReplacedRoute)
+    assertEquals(1, navigator.replaceCallCount)
+    assertEquals(0, navigator.pushCallCount)
   }
 }
 
