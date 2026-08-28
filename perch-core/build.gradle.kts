@@ -2,6 +2,7 @@ plugins {
   alias(libs.plugins.kotlinMultiplatform)
   alias(libs.plugins.androidKmpLibrary)
   alias(libs.plugins.kotlinSerialization)
+  id("dev.carcara.perch.detekt")
 }
 
 kotlin {

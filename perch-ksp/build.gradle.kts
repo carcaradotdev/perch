@@ -1,5 +1,6 @@
 plugins {
   kotlin("jvm")
+  id("dev.carcara.perch.detekt")
 }
 
 kotlin {
