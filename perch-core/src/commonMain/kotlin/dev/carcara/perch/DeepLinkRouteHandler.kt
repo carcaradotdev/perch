@@ -6,8 +6,8 @@ package dev.carcara.perch
  * Use a handler when navigating to the original route requires a long-running setup step
  * (fetching state, resolving an id, deciding whether the user is allowed to land on the
  * screen, etc.). The handler runs as a `suspend` function on [DeepLinkManager]'s
- * `handlerDispatcher` — [kotlinx.coroutines.Dispatchers.Default] by default — and the
- * cold-start splash stays visible while it executes; warm-start runs silently in the
+ * `handlerDispatcher` — [kotlinx.coroutines.Dispatchers.Default] by default — and a consumer's
+ * cold-start loading screen stays visible while it executes; warm-start runs silently in the
  * background with no extra UI.
  *
  * Register by putting it in the handler map you pass to [DeepLinkManager]:
@@ -36,8 +36,7 @@ public fun interface DeepLinkRouteHandler<R : DeepLinkTarget> {
  * - [Fallback]: handler hit a recoverable error (e.g. user not eligible) and is
  *   redirecting elsewhere (Home, Login, an error screen, etc.).
  * - [Cancel]: drop the deep link entirely. [DeepLinkManager] performs no navigation;
- *   normal cold-start flow (the startup presenter) resolves the destination as if the
- *   deep link had never arrived.
+ *   normal cold-start flow resolves the destination as if the deep link had never arrived.
  */
 public sealed interface DeepLinkResolution {
   /** Resolutions that should produce navigation. */

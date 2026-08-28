@@ -67,8 +67,8 @@ public interface DeepLinkBootstrapState {
  * `suspend` work (state fetch, eligibility checks) before the user lands on the
  * deep-link target. While the handler runs:
  *
- * - **Cold start**: [isProcessingDeepLink] is true; the app's startup presenter
- *   keeps its loading state, so the existing splash stays visible.
+ * - **Cold start**: [isProcessingDeepLink] is true; a consumer that shows a loading screen on
+ *   cold start should keep it visible for as long as this stays true.
  * - **Warm start**: handler runs silently in the background; user stays on
  *   their current screen until the handler resolves.
  *
@@ -76,12 +76,12 @@ public interface DeepLinkBootstrapState {
  * gate the original ingress target went through — so a handler that suspends
  * long enough for the lock screen to re-appear, or whose resolved target has a
  * different `requiresAuth` than the incoming one, still honours the gate.
- * [isProcessingDeepLink] stays true through that second wait too, so the splash
- * does not flash through to the wrong destination.
+ * [isProcessingDeepLink] stays true through that second wait too, so a cold-start loading
+ * screen does not flash through to the wrong destination.
  *
  * Once the manager actually performs navigation for a handler-driven deep link,
- * [bootstrapTakenOver] flips true so the startup presenter does not race-overwrite the
- * deep-link destination with its own setRoot call.
+ * [bootstrapTakenOver] flips true, so a consumer that also sets an initial destination on cold
+ * start must not do so afterwards, or it will race-overwrite the deep-link destination.
  */
 public class DeepLinkManager public constructor(
   private val navigator: DeepLinkNavigator,
@@ -106,8 +106,8 @@ public class DeepLinkManager public constructor(
    * The deep-link target queued for navigation, waiting on the auth, lock or
    * navigation-ready gate.
    *
-   * Null once [DeepLinkNavigator] has been given the target, or after [clearPendingRoute]
-   * drops it.
+   * Null just before [DeepLinkManager] dispatches the target to [DeepLinkNavigator], or after
+   * [clearPendingRoute] drops it.
    */
   public val pendingRoute: StateFlow<DeepLinkTarget?> = _pendingRoute
     .map { it?.route }
