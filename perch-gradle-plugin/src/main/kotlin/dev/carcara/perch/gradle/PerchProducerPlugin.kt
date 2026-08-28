@@ -49,13 +49,18 @@ public class PerchProducerPlugin : Plugin<Project> {
       outgoing.artifact(kspManifestsDir) { builtBy("kspCommonMainKotlinMetadata") }
     }
 
+    // `dependencies.addLater` defers this lambda to execution time, so it must not close over
+    // `project` itself — that would pull a live `Project` reference into cached task state,
+    // the single most common configuration-cache violation. Capture the `DependencyHandler`
+    // value instead.
+    val dependencyHandler = project.dependencies
     project.configurations.matching { it.name == "kspCommonMainMetadata" }.configureEach {
       dependencies.addLater(
         extension.processorCoordinates.map { coordinate ->
           if (coordinate.startsWith(":")) {
-            project.dependencies.project(mapOf("path" to coordinate))
+            dependencyHandler.project(mapOf("path" to coordinate))
           } else {
-            project.dependencies.create(coordinate)
+            dependencyHandler.create(coordinate)
           }
         },
       )
@@ -63,15 +68,20 @@ public class PerchProducerPlugin : Plugin<Project> {
 
     project.plugins.withId("com.google.devtools.ksp") {
       val ksp = project.extensions.getByType(KspExtension::class.java)
+      // Same reason as above: `ksp.arg`'s Provider overload defers this lambda too, so it
+      // captures the project's path as a plain String rather than the `Project` itself.
+      val projectPath = project.path
       val outputPackage = project.provider {
         extension.outputPackage.orNull
-          ?: throw GradleException("dev.carcara.perch: set `perch.outputPackage` in ${project.path}")
+          ?: throw GradleException("dev.carcara.perch: set `perch.outputPackage` in $projectPath")
       }
       ksp.arg("perch.outputPackage", outputPackage)
       ksp.arg("perch.targetBaseClass", extension.targetBaseClass)
       ksp.arg("perch.parserClass", extension.parserClass)
     }
 
+    // afterEvaluate runs during configuration, before configuration-cache state is captured, so
+    // closing over `project` here (unlike the two deferred lambdas above) is not a CC violation.
     project.afterEvaluate {
       if (!project.pluginManager.hasPlugin("com.google.devtools.ksp")) {
         throw GradleException(

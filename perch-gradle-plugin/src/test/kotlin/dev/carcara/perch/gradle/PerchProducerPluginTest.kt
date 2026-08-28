@@ -96,7 +96,13 @@ class PerchProducerPluginTest {
       """,
     )
 
-    val result = runner("kspCommonMainKotlinMetadata").buildAndFail()
+    // --configuration-cache on this nested build (not the outer one running the test) runs the
+    // outputPackage check under the mode every real consumer builds with. It does not, on its
+    // own, prove the Provider's closure is free of a live `Project` capture — Gradle's own
+    // "execution time value" optimisation for a plain `project.provider { }` evaluates that
+    // closure once during the configuration-cache store step regardless of what it captures, so
+    // the fix here is defensive/future-proofing rather than something this assertion can pin.
+    val result = runner("kspCommonMainKotlinMetadata", "--configuration-cache").buildAndFail()
 
     assertTrue(result.output.contains("set `perch.outputPackage`"))
   }
@@ -122,7 +128,7 @@ class PerchProducerPluginTest {
       """,
     )
 
-    val result = runner("printConfig").build()
+    val result = runner("printConfig", "--configuration-cache").build()
 
     assertEquals(TaskOutcome.SUCCESS, result.task(":printConfig")?.outcome)
     assertTrue(result.output.contains("CONFIG PRESENT"))
@@ -152,16 +158,19 @@ class PerchProducerPluginTest {
       }
 
       tasks.register("printProcessorDependency") {
-        doLast {
-          val dependencies = configurations.getByName("kspCommonMainMetadata").dependencies
-          val isProjectDependency = dependencies.any { it is ProjectDependency && it.path == ":proc" }
-          println("PROJECT_DEPENDENCY=${'$'}isProjectDependency")
-        }
+        // Resolved here, inside the task's own configuration lambda — same as the brief's
+        // "registers a consumable manifest configuration" fixture. A top-level script `val`
+        // read from `doLast` needs the script instance itself to reach it, which configuration
+        // cache refuses to serialize as a "Gradle script object reference"; a value local to
+        // this lambda is instead captured directly, with no such reference required.
+        val dependencies = configurations.getByName("kspCommonMainMetadata").dependencies
+        val isProjectDependency = dependencies.any { it is ProjectDependency && it.path == ":proc" }
+        doLast { println("PROJECT_DEPENDENCY=${'$'}isProjectDependency") }
       }
       """,
     )
 
-    val result = runner("printProcessorDependency").build()
+    val result = runner("printProcessorDependency", "--configuration-cache").build()
 
     assertTrue(result.output.contains("PROJECT_DEPENDENCY=true"))
   }
