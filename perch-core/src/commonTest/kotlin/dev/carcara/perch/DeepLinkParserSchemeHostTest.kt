@@ -287,13 +287,13 @@ class DeepLinkParserSchemeHostTest {
 }
 
 @DeepLink("/payments/{id}")
-private class PaymentLink(val id: String) : DeepLinkTarget
+private class PaymentLink(val id: String)
 
 @DeepLink("/pay.co/{id}")
-private class DottedLink(val id: String) : DeepLinkTarget
+private class DottedLink(val id: String)
 
 @DeepLink("/search")
-private class SearchLink(val query: String) : DeepLinkTarget
+private class SearchLink(val query: String)
 
 @DeepLink("/{tenant}/payments/{id}")
-private class TenantLink(val tenant: String, val id: String) : DeepLinkTarget
+private class TenantLink(val tenant: String, val id: String)

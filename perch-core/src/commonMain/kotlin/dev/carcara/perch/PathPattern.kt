@@ -172,7 +172,7 @@ internal sealed class PathSegment {
 }
 
 /** One registered route: its serialiser, its compiled path pattern, and the format to decode with. */
-internal class RegisteredRoute<T : DeepLinkTarget>(
+internal class RegisteredRoute<T : Any>(
   private val serializer: KSerializer<T>,
   pathPattern: String,
   private val format: DeepLinkFormat,

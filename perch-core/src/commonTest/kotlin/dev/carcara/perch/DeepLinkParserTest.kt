@@ -205,6 +205,32 @@ class DeepLinkParserTest {
   }
 
   @Test
+  fun `narrowing the result keeps a when over a sealed route type exhaustive`() {
+    // Perch imposes no supertype, so `parse` hands back Any?. An app that groups its routes under
+    // a sealed type of its own narrows once and keeps the exhaustive `when`, with no `else`. This
+    // test compiling is the assertion.
+    val subject = parser()
+    subject.register<SealedPayment>()
+    subject.register<SealedHome>()
+
+    val label = when (val route = subject.parse("acme://sealed/payments/abc123") as? SealedRoute) {
+      is SealedPayment -> route.id
+      is SealedHome -> "home"
+      null -> "unmatched"
+    }
+
+    assertEquals("abc123", label)
+  }
+
+  @Test
+  fun `a route the parser knows but the app's own type does not cover narrows to null`() {
+    val subject = parser()
+    subject.register<PaymentDeepLink>()
+
+    assertNull(subject.parse("acme://payments/abc123") as? SealedRoute)
+  }
+
+  @Test
   fun `roundtrip - parse generated URL`() {
     val subject = parser()
     subject.register<PaymentDeepLink>()
@@ -494,75 +520,84 @@ class DeepLinkParserTest {
   }
 }
 
+/** An app's own route type, which Perch neither requires nor knows about. */
+internal sealed interface SealedRoute
+
+@DeepLink("/sealed/payments/{id}")
+internal data class SealedPayment(val id: String) : SealedRoute
+
+@DeepLink("/sealed/home")
+internal data object SealedHome : SealedRoute
+
 // A serializable deep-link target with no @DeepLink — the shape a stale generated registration
 // produces when a route's @DeepLink is removed but its module's manifest still lists it.
 @Serializable
-data object RouteWithoutAnnotation : DeepLinkTarget
+data object RouteWithoutAnnotation
 
 @DeepLink("/payments/{id}")
-data class PaymentDeepLink(val id: String) : DeepLinkTarget
+data class PaymentDeepLink(val id: String)
 
 @DeepLink("/transactions/{id}/details")
-data class TransactionDetailDeepLink(val id: String) : DeepLinkTarget
+data class TransactionDetailDeepLink(val id: String)
 
 @DeepLink("/search")
 data class SearchDeepLink(
   val query: String,
   val limit: Int = 20,
-) : DeepLinkTarget
+)
 
 @DeepLink("/profile/{userId?}")
-data class ProfileDeepLink(val userId: String? = null) : DeepLinkTarget
+data class ProfileDeepLink(val userId: String? = null)
 
 @DeepLink("/orders/{orderId}/items/{itemId}")
 data class OrderItemDeepLink(
   val orderId: String,
   val itemId: String,
-) : DeepLinkTarget
+)
 
 @DeepLink("/home")
-class HomeDeepLink : DeepLinkTarget
+class HomeDeepLink
 
 // =============================================================================
 // Targets for edge cases and advanced features
 // =============================================================================
 
 @DeepLink("/feature/list")
-data object FeatureListNoSlash : DeepLinkTarget
+data object FeatureListNoSlash
 
 @DeepLink("/feature/list/")
-data object FeatureListWithSlash : DeepLinkTarget
+data object FeatureListWithSlash
 
 @DeepLink("/feature/{id}")
-data class FeatureByIdDeepLink(val id: String) : DeepLinkTarget
+data class FeatureByIdDeepLink(val id: String)
 
 @DeepLink("/feature/{name}")
-data class FeatureByNameDeepLink(val name: String) : DeepLinkTarget
+data class FeatureByNameDeepLink(val name: String)
 
 @DeepLink("/feature/details")
-data object FeatureDetailsDeepLink : DeepLinkTarget
+data object FeatureDetailsDeepLink
 
 @DeepLink("/feature/list/details")
-data object FeatureListDetailsDeepLink : DeepLinkTarget
+data object FeatureListDetailsDeepLink
 
 @DeepLink("/transfer/{id}")
 data class TransferDeepLink(
   @kotlinx.serialization.SerialName("id")
   val transferId: String,
-) : DeepLinkTarget
+)
 
 @DeepLink("/articles")
-data class ArticlesDeepLink(val sort: String? = "new") : DeepLinkTarget {
+data class ArticlesDeepLink(val sort: String? = "new") {
   @DeepLink("new")
-  data class New(val parent: ArticlesDeepLink = ArticlesDeepLink()) : DeepLinkTarget
+  data class New(val parent: ArticlesDeepLink = ArticlesDeepLink())
 
   @DeepLink("{id}")
   data class ById(
     val parent: ArticlesDeepLink = ArticlesDeepLink(),
     val id: Long,
-  ) : DeepLinkTarget {
+  ) {
     @DeepLink("edit")
-    data class Edit(val parent: ById) : DeepLinkTarget
+    data class Edit(val parent: ById)
   }
 }
 
@@ -571,4 +606,4 @@ data class ItemsDeepLink(
   val page: Int = 1,
   val limit: Int = 20,
   val filter: String? = null,
-) : DeepLinkTarget
+)
