@@ -22,4 +22,6 @@ kotlin {
   }
 }
 
-perchAggregation { outputPackage.set("com.example.sample.app") }
+perchAggregation {
+  outputPackage.set("com.example.sample.app")
+}

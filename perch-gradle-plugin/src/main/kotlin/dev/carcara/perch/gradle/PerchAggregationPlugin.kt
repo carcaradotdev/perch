@@ -21,6 +21,16 @@ public abstract class PerchAggregationExtension {
   /** Package the generated `registerAllDeepLinks()` extension is emitted into. Required. */
   public abstract val outputPackage: Property<String>
 
+  /**
+   * Fully qualified name of your app's route type, which becomes the parser's type argument in the
+   * generated `DeepLinkParser<...>.registerAllDeepLinks()`.
+   *
+   * Optional. Each producer records the type it inferred in its manifest, so this is only needed
+   * when the reachable producers disagree — and then it must be a supertype of every route they
+   * declare.
+   */
+  public abstract val targetBaseClass: Property<String>
+
   /** Fully qualified name of the parser the generated extension is declared on. */
   public abstract val parserClass: Property<String>
 }
@@ -55,6 +65,7 @@ public class PerchAggregationPlugin : Plugin<Project> {
       group = "build"
       description = "Generates registerAllDeepLinks() from every reachable route manifest"
       outputPackage.set(extension.outputPackage)
+      targetBaseClass.set(extension.targetBaseClass)
       parserClass.set(extension.parserClass)
       this.outputDirectory.set(outputDirectory)
     }

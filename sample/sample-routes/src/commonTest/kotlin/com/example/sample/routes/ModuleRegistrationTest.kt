@@ -18,7 +18,7 @@ class ModuleRegistrationTest {
 
   @Test
   fun `registerDeepLinks registers every route this module declares`() {
-    val parser = DeepLinkParser(schemes = setOf("sample")).apply { registerDeepLinks() }
+    val parser = DeepLinkParser<SampleRoute>(schemes = setOf("sample")).apply { registerDeepLinks() }
 
     assertIs<HomeLink>(parser.parse("sample://home"))
 

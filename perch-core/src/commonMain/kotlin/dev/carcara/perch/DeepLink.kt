@@ -18,10 +18,15 @@ import kotlinx.serialization.SerialInfo
  * that placeholder; the rest become query parameters.
  *
  * ```kotlin
+ * sealed interface Route
+ *
  * @DeepLink("/payments/{id}")
- * class PaymentLink(val id: String, val tab: String? = null) : DeepLinkTarget
+ * class PaymentLink(val id: String, val tab: String? = null) : Route
  * // acme://payments/abc123?tab=receipt
  * ```
+ *
+ * `Route` is the app's own type. Perch has no supertype of its own for routes to implement; the
+ * base type is whatever [DeepLinkParser] is parameterised on.
  *
  * Placeholder forms, matching Ktor's routing conventions:
  * - `{name}` a required path parameter
@@ -33,9 +38,9 @@ import kotlinx.serialization.SerialInfo
  *
  * ```kotlin
  * @DeepLink("/orders")
- * class Orders : DeepLinkTarget {
+ * class Orders : Route {
  *   @DeepLink("/{id}")
- *   class ById(val parent: Orders = Orders(), val id: String) : DeepLinkTarget
+ *   class ById(val parent: Orders = Orders(), val id: String) : Route
  * }
  * ```
  *

@@ -32,7 +32,14 @@ public abstract class PerchExtension {
    */
   public abstract val processorCoordinates: Property<String>
 
-  /** Fully qualified name of the interface a route must implement to count as a deep link. */
+  /**
+   * Fully qualified name of your app's route type, which becomes the parser's type argument in the
+   * generated `DeepLinkParser<...>.registerDeepLinks()`.
+   *
+   * Optional. The processor reads it off the routes themselves — the one supertype they all share —
+   * so this is only for a module whose routes share more than one, or where a wider type than the
+   * shared one is wanted.
+   */
   public abstract val targetBaseClass: Property<String>
 
   /** Fully qualified name of the parser the generated extension targets. */
@@ -51,7 +58,6 @@ public class PerchProducerPlugin : Plugin<Project> {
   override fun apply(project: Project) {
     val extension = project.extensions.create("perch", PerchExtension::class.java)
     extension.processorCoordinates.convention("dev.carcara.perch:perch-ksp:${PerchVersion.value}")
-    extension.targetBaseClass.convention("dev.carcara.perch.DeepLinkTarget")
     extension.parserClass.convention("dev.carcara.perch.DeepLinkParser")
 
     // The perch-manifest-*.txt files the processor writes land in the shared KSP resources
@@ -89,7 +95,9 @@ public class PerchProducerPlugin : Plugin<Project> {
           ?: throw GradleException("dev.carcara.perch: set `perch.outputPackage` in $projectPath")
       }
       ksp.arg("perch.outputPackage", outputPackage)
-      ksp.arg("perch.targetBaseClass", extension.targetBaseClass)
+      // Empty rather than absent: KSP options are plain strings, and the processor reads an empty
+      // one as "infer it from the routes".
+      ksp.arg("perch.targetBaseClass", extension.targetBaseClass.orElse(""))
       ksp.arg("perch.parserClass", extension.parserClass)
     }
 

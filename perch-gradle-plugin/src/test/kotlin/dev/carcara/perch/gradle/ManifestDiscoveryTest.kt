@@ -34,7 +34,7 @@ class ManifestDiscoveryTest {
   }
 
   private fun producer(name: String, route: String) {
-    file("$name/manifests/perch-manifest-$name.txt", "$route|com.acme.$name.Route|$name")
+    file("$name/manifests/perch-manifest-$name.txt", "$route|com.acme.$name.Route|$name|com.acme.routes.AppRoute")
     file(
       "$name/build.gradle.kts",
       """

@@ -1,5 +1,6 @@
 package com.example.sample.app
 
+import com.example.sample.routes.SampleRoute
 import dev.carcara.perch.DeepLinkParser
 
 /**
@@ -12,6 +13,6 @@ import dev.carcara.perch.DeepLinkParser
  * `hosts` is non-empty because `schemes` carries `https`: `DeepLinkParser` rejects `http` or
  * `https` without hosts, since an empty host set would let any website deep-link into these routes.
  */
-public fun sampleParser(): DeepLinkParser =
-  DeepLinkParser(schemes = setOf("sample", "https"), hosts = setOf("sample.example"))
+public fun sampleParser(): DeepLinkParser<SampleRoute> =
+  DeepLinkParser<SampleRoute>(schemes = setOf("sample", "https"), hosts = setOf("sample.example"))
     .apply { registerAllDeepLinks() }

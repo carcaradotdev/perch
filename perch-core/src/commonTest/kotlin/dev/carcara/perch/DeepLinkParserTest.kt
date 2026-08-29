@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 
 class DeepLinkParserTest {
 
-  private fun parser() = DeepLinkParser(schemes = setOf("acme"))
+  private fun parser() = DeepLinkParser<TestRoute>(schemes = setOf("acme"))
 
   @Test
   fun `parse simple path with required parameter`() {
@@ -494,75 +494,78 @@ class DeepLinkParserTest {
   }
 }
 
+/** The base type these tests parameterise the parser on, standing in for an app's own route type. */
+internal interface TestRoute
+
 // A serializable deep-link target with no @DeepLink — the shape a stale generated registration
 // produces when a route's @DeepLink is removed but its module's manifest still lists it.
 @Serializable
-data object RouteWithoutAnnotation : DeepLinkTarget
+data object RouteWithoutAnnotation : TestRoute
 
 @DeepLink("/payments/{id}")
-data class PaymentDeepLink(val id: String) : DeepLinkTarget
+data class PaymentDeepLink(val id: String) : TestRoute
 
 @DeepLink("/transactions/{id}/details")
-data class TransactionDetailDeepLink(val id: String) : DeepLinkTarget
+data class TransactionDetailDeepLink(val id: String) : TestRoute
 
 @DeepLink("/search")
 data class SearchDeepLink(
   val query: String,
   val limit: Int = 20,
-) : DeepLinkTarget
+) : TestRoute
 
 @DeepLink("/profile/{userId?}")
-data class ProfileDeepLink(val userId: String? = null) : DeepLinkTarget
+data class ProfileDeepLink(val userId: String? = null) : TestRoute
 
 @DeepLink("/orders/{orderId}/items/{itemId}")
 data class OrderItemDeepLink(
   val orderId: String,
   val itemId: String,
-) : DeepLinkTarget
+) : TestRoute
 
 @DeepLink("/home")
-class HomeDeepLink : DeepLinkTarget
+class HomeDeepLink : TestRoute
 
 // =============================================================================
 // Targets for edge cases and advanced features
 // =============================================================================
 
 @DeepLink("/feature/list")
-data object FeatureListNoSlash : DeepLinkTarget
+data object FeatureListNoSlash : TestRoute
 
 @DeepLink("/feature/list/")
-data object FeatureListWithSlash : DeepLinkTarget
+data object FeatureListWithSlash : TestRoute
 
 @DeepLink("/feature/{id}")
-data class FeatureByIdDeepLink(val id: String) : DeepLinkTarget
+data class FeatureByIdDeepLink(val id: String) : TestRoute
 
 @DeepLink("/feature/{name}")
-data class FeatureByNameDeepLink(val name: String) : DeepLinkTarget
+data class FeatureByNameDeepLink(val name: String) : TestRoute
 
 @DeepLink("/feature/details")
-data object FeatureDetailsDeepLink : DeepLinkTarget
+data object FeatureDetailsDeepLink : TestRoute
 
 @DeepLink("/feature/list/details")
-data object FeatureListDetailsDeepLink : DeepLinkTarget
+data object FeatureListDetailsDeepLink : TestRoute
 
 @DeepLink("/transfer/{id}")
 data class TransferDeepLink(
   @kotlinx.serialization.SerialName("id")
   val transferId: String,
-) : DeepLinkTarget
+) : TestRoute
 
 @DeepLink("/articles")
-data class ArticlesDeepLink(val sort: String? = "new") : DeepLinkTarget {
+data class ArticlesDeepLink(val sort: String? = "new") : TestRoute {
   @DeepLink("new")
-  data class New(val parent: ArticlesDeepLink = ArticlesDeepLink()) : DeepLinkTarget
+  data class New(val parent: ArticlesDeepLink = ArticlesDeepLink()) : TestRoute
 
   @DeepLink("{id}")
   data class ById(
     val parent: ArticlesDeepLink = ArticlesDeepLink(),
     val id: Long,
-  ) : DeepLinkTarget {
+  ) : TestRoute {
     @DeepLink("edit")
-    data class Edit(val parent: ById) : DeepLinkTarget
+    data class Edit(val parent: ById) : TestRoute
   }
 }
 
@@ -571,4 +574,4 @@ data class ItemsDeepLink(
   val page: Int = 1,
   val limit: Int = 20,
   val filter: String? = null,
-) : DeepLinkTarget
+) : TestRoute

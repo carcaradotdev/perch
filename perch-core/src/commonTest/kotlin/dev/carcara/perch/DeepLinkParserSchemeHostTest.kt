@@ -11,7 +11,7 @@ class DeepLinkParserSchemeHostTest {
   private fun parser(
     schemes: Set<String> = setOf("acme"),
     hosts: Set<String> = emptySet(),
-  ) = DeepLinkParser(schemes = schemes, hosts = hosts).apply { register<PaymentLink>() }
+  ) = DeepLinkParser<TestRoute>(schemes = schemes, hosts = hosts).apply { register<PaymentLink>() }
 
   @Test
   fun `a registered scheme parses`() {
@@ -57,13 +57,13 @@ class DeepLinkParserSchemeHostTest {
     // Registering https with no hosts means "any website may deep-link into these routes", which
     // is the vulnerability this whole design removes, reached by omitting an optional parameter.
     assertFailsWith<IllegalArgumentException> {
-      DeepLinkParser(schemes = setOf("acme", "https"))
+      DeepLinkParser<TestRoute>(schemes = setOf("acme", "https"))
     }
   }
 
   @Test
   fun `a custom scheme with no hosts is fine`() {
-    val subject = DeepLinkParser(schemes = setOf("acme")).apply { register<PaymentLink>() }
+    val subject = DeepLinkParser<TestRoute>(schemes = setOf("acme")).apply { register<PaymentLink>() }
 
     assertIs<PaymentLink>(subject.parse("acme://payments/abc123"))
   }
@@ -82,8 +82,8 @@ class DeepLinkParserSchemeHostTest {
 
   @Test
   fun `two parsers keep separate registries`() {
-    val registered = DeepLinkParser(schemes = setOf("acme")).apply { register<PaymentLink>() }
-    val empty = DeepLinkParser(schemes = setOf("acme"))
+    val registered = DeepLinkParser<TestRoute>(schemes = setOf("acme")).apply { register<PaymentLink>() }
+    val empty = DeepLinkParser<TestRoute>(schemes = setOf("acme"))
 
     assertIs<PaymentLink>(registered.parse("acme://payments/abc123"))
     assertNull(empty.parse("acme://payments/abc123"))
@@ -91,7 +91,7 @@ class DeepLinkParserSchemeHostTest {
 
   @Test
   fun `toUrl uses the first custom scheme`() {
-    val subject = DeepLinkParser(schemes = setOf("acme", "https"), hosts = setOf("acme.com"))
+    val subject = DeepLinkParser<TestRoute>(schemes = setOf("acme", "https"), hosts = setOf("acme.com"))
 
     assertEquals("acme://payments/abc123", subject.toUrl(PaymentLink("abc123")))
   }
@@ -101,7 +101,7 @@ class DeepLinkParserSchemeHostTest {
     // One edit away from the README's own `setOf("myapp", "https")`. Emitting `schemes.first()`
     // here would produce `https://payments/abc123`, putting the route's first path element in the
     // host position, and the same parser would then refuse to parse it back.
-    val subject = DeepLinkParser(schemes = setOf("https", "acme"), hosts = setOf("acme.com"))
+    val subject = DeepLinkParser<TestRoute>(schemes = setOf("https", "acme"), hosts = setOf("acme.com"))
       .apply { register<PaymentLink>() }
 
     assertEquals("acme://payments/abc123", subject.toUrl(PaymentLink("abc123")))
@@ -110,7 +110,7 @@ class DeepLinkParserSchemeHostTest {
 
   @Test
   fun `toUrl emits a host when every configured scheme is hierarchical`() {
-    val subject = DeepLinkParser(schemes = setOf("https"), hosts = setOf("acme.com"))
+    val subject = DeepLinkParser<TestRoute>(schemes = setOf("https"), hosts = setOf("acme.com"))
       .apply { register<PaymentLink>() }
 
     assertEquals("https://acme.com/payments/abc123", subject.toUrl(PaymentLink("abc123")))
@@ -119,14 +119,14 @@ class DeepLinkParserSchemeHostTest {
 
   @Test
   fun `toUrl emits the scheme lowercased`() {
-    val subject = DeepLinkParser(schemes = setOf("ACME"))
+    val subject = DeepLinkParser<TestRoute>(schemes = setOf("ACME"))
 
     assertEquals("acme://payments/abc123", subject.toUrl(PaymentLink("abc123")))
   }
 
   @Test
   fun `schemes and hosts configured in uppercase still match`() {
-    val subject = DeepLinkParser(schemes = setOf("ACME", "HTTPS"), hosts = setOf("ACME.COM"))
+    val subject = DeepLinkParser<TestRoute>(schemes = setOf("ACME", "HTTPS"), hosts = setOf("ACME.COM"))
       .apply { register<PaymentLink>() }
 
     assertIs<PaymentLink>(subject.parse("acme://payments/abc123"))
@@ -196,7 +196,7 @@ class DeepLinkParserSchemeHostTest {
 
   @Test
   fun `a scheme without a double slash cannot launder into a schemeless path`() {
-    val subject = DeepLinkParser(schemes = setOf("https"), hosts = setOf("acme.com"))
+    val subject = DeepLinkParser<TestRoute>(schemes = setOf("https"), hosts = setOf("acme.com"))
       .apply { register<TenantLink>() }
 
     assertNull(subject.parse("https:\\evil.example/payments/abc123"))
@@ -219,7 +219,7 @@ class DeepLinkParserSchemeHostTest {
 
   @Test
   fun `a custom scheme keeps a dotted first path segment`() {
-    val subject = DeepLinkParser(schemes = setOf("acme")).apply { register<DottedLink>() }
+    val subject = DeepLinkParser<TestRoute>(schemes = setOf("acme")).apply { register<DottedLink>() }
 
     assertIs<DottedLink>(subject.parse("acme://pay.co/abc123"))
   }
@@ -282,18 +282,18 @@ class DeepLinkParserSchemeHostTest {
   }
 
   private fun searchParser() =
-    DeepLinkParser(schemes = setOf("https"), hosts = setOf("acme.com"))
+    DeepLinkParser<TestRoute>(schemes = setOf("https"), hosts = setOf("acme.com"))
       .apply { register<SearchLink>() }
 }
 
 @DeepLink("/payments/{id}")
-private class PaymentLink(val id: String) : DeepLinkTarget
+private class PaymentLink(val id: String) : TestRoute
 
 @DeepLink("/pay.co/{id}")
-private class DottedLink(val id: String) : DeepLinkTarget
+private class DottedLink(val id: String) : TestRoute
 
 @DeepLink("/search")
-private class SearchLink(val query: String) : DeepLinkTarget
+private class SearchLink(val query: String) : TestRoute
 
 @DeepLink("/{tenant}/payments/{id}")
-private class TenantLink(val tenant: String, val id: String) : DeepLinkTarget
+private class TenantLink(val tenant: String, val id: String) : TestRoute

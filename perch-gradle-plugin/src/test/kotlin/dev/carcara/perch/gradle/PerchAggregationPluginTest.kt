@@ -153,7 +153,9 @@ class PerchAggregationPluginTest {
 
     assertEquals(TaskOutcome.SUCCESS, result.task(":app:generateDeepLinkRegistration")?.outcome)
     val text = generated().readText()
-    assertTrue(text.contains("public fun DeepLinkParser.registerAllDeepLinks()"))
+    // Nothing to register means no route type to name, and a function generic in the parser's
+    // type argument compiles against whatever parser the app has.
+    assertTrue(text, text.contains("public fun <T : Any> DeepLinkParser<T>.registerAllDeepLinks()"))
     assertFalse(text.contains("register<"))
     // The fail-open path is indistinguishable from an empty graph, so it has to say so out loud.
     assertTrue(result.output.contains("no deep-link routes were discovered"))
@@ -164,8 +166,8 @@ class PerchAggregationPluginTest {
     fixture("alpha", "beta", "app")
     // Same simple name, two packages: the case that makes importing by simple name generate code
     // that does not compile.
-    producer("alpha", "/alpha/{id}|com.acme.alpha.Details|com.acme.alpha")
-    producer("beta", "/beta|com.acme.beta.Details|com.acme.beta")
+    producer("alpha", "/alpha/{id}|com.acme.alpha.Details|com.acme.alpha|com.acme.routes.AppRoute")
+    producer("beta", "/beta|com.acme.beta.Details|com.acme.beta|com.acme.routes.AppRoute")
     // commonMainImplementation and commonMainApi are sibling buckets - neither extends the other -
     // so a producer reached through `api(project(...))` is invisible unless both are extended.
     consumer(implementation("alpha"), api("beta"))
@@ -173,6 +175,9 @@ class PerchAggregationPluginTest {
     val result = runner(":app:generateDeepLinkRegistration").build()
 
     val text = generated().readText()
+    // The route type comes off the manifests: the processor records what it inferred per module,
+    // so nothing in either build script has to name it.
+    assertTrue(text, text.contains("public fun DeepLinkParser<com.acme.routes.AppRoute>.registerAllDeepLinks()"))
     assertTrue(text, text.contains("register<com.acme.alpha.Details>()"))
     assertTrue(text, text.contains("register<com.acme.beta.Details>()"))
     assertFalse(text, text.contains("import com.acme.alpha.Details"))
@@ -181,11 +186,42 @@ class PerchAggregationPluginTest {
   }
 
   @Test
+  fun `producers disagreeing on the route type fail, naming both and the way out`() {
+    fixture("alpha", "beta", "app")
+    producer("alpha", "/alpha|com.acme.alpha.AlphaLink|com.acme.alpha|com.acme.alpha.AlphaRoute")
+    producer("beta", "/beta|com.acme.beta.BetaLink|com.acme.beta|com.acme.beta.BetaRoute")
+    consumer(implementation("alpha"), implementation("beta"))
+
+    val result = runner(":app:generateDeepLinkRegistration").buildAndFail()
+
+    assertTrue(result.output, result.output.contains("2 different route types"))
+    assertTrue(result.output, result.output.contains("com.acme.alpha.AlphaRoute, com.acme.beta.BetaRoute"))
+    assertTrue(result.output, result.output.contains("targetBaseClass"))
+  }
+
+  @Test
+  fun `an explicit route type settles a disagreement between producers`() {
+    fixture("alpha", "beta", "app")
+    producer("alpha", "/alpha|com.acme.alpha.AlphaLink|com.acme.alpha|com.acme.alpha.AlphaRoute")
+    producer("beta", "/beta|com.acme.beta.BetaLink|com.acme.beta|com.acme.beta.BetaRoute")
+    consumer(
+      implementation("alpha"),
+      implementation("beta"),
+      extraScript = "perchAggregation { targetBaseClass.set(\"com.acme.routes.AppRoute\") }",
+    )
+
+    runner(":app:generateDeepLinkRegistration").build()
+
+    val text = generated().readText()
+    assertTrue(text, text.contains("public fun DeepLinkParser<com.acme.routes.AppRoute>.registerAllDeepLinks()"))
+  }
+
+  @Test
   fun `aggregates routes for a consumer that targets only iOS`() {
     fixture("alpha", "app")
     producer(
       "alpha",
-      "/alpha/{id}|com.acme.alpha.AlphaLink|com.acme.alpha",
+      "/alpha/{id}|com.acme.alpha.AlphaLink|com.acme.alpha|com.acme.routes.AppRoute",
       targets = "iosSimulatorArm64()",
     )
     consumer(implementation("alpha"), targets = "iosSimulatorArm64()")
@@ -199,8 +235,8 @@ class PerchAggregationPluginTest {
   @Test
   fun `deduplicates a route named by two manifests`() {
     fixture("alpha", "beta", "app")
-    producer("alpha", "/shared|com.acme.shared.SharedLink|com.acme.alpha")
-    producer("beta", "/shared|com.acme.shared.SharedLink|com.acme.beta")
+    producer("alpha", "/shared|com.acme.shared.SharedLink|com.acme.alpha|com.acme.routes.AppRoute")
+    producer("beta", "/shared|com.acme.shared.SharedLink|com.acme.beta|com.acme.routes.AppRoute")
     consumer(implementation("alpha"), implementation("beta"))
 
     runner(":app:generateDeepLinkRegistration").build()
@@ -253,7 +289,7 @@ class PerchAggregationPluginTest {
     fixture("alpha", "app")
     producer(
       "alpha",
-      "/alpha|com.acme.alpha.AlphaLink|com.acme.alpha",
+      "/alpha|com.acme.alpha.AlphaLink|com.acme.alpha|com.acme.routes.AppRoute",
       "this line has no fields at all",
     )
     consumer(implementation("alpha"))
@@ -269,14 +305,14 @@ class PerchAggregationPluginTest {
   @Test
   fun `regenerates when a manifest changes`() {
     fixture("alpha", "app")
-    producer("alpha", "/alpha|com.acme.alpha.AlphaLink|com.acme.alpha")
+    producer("alpha", "/alpha|com.acme.alpha.AlphaLink|com.acme.alpha|com.acme.routes.AppRoute")
     consumer(implementation("alpha"))
 
     runner(":app:generateDeepLinkRegistration").build()
     assertTrue(generated().readText().contains("register<com.acme.alpha.AlphaLink>()"))
 
     File(projectDir.root, "alpha/manifests/perch-manifest-alpha.txt")
-      .writeText("/gamma|com.acme.alpha.GammaLink|com.acme.alpha")
+      .writeText("/gamma|com.acme.alpha.GammaLink|com.acme.alpha|com.acme.routes.AppRoute")
 
     val second = runner(":app:generateDeepLinkRegistration").build()
 
@@ -287,7 +323,7 @@ class PerchAggregationPluginTest {
   @Test
   fun `is up to date on a rerun with no change`() {
     fixture("alpha", "app")
-    producer("alpha", "/alpha|com.acme.alpha.AlphaLink|com.acme.alpha")
+    producer("alpha", "/alpha|com.acme.alpha.AlphaLink|com.acme.alpha|com.acme.routes.AppRoute")
     consumer(implementation("alpha"))
 
     runner(":app:generateDeepLinkRegistration").build()
@@ -299,7 +335,7 @@ class PerchAggregationPluginTest {
   @Test
   fun `runs with the configuration cache enabled`() {
     fixture("alpha", "app")
-    producer("alpha", "/alpha|com.acme.alpha.AlphaLink|com.acme.alpha")
+    producer("alpha", "/alpha|com.acme.alpha.AlphaLink|com.acme.alpha|com.acme.routes.AppRoute")
     consumer(implementation("alpha"))
 
     val first = runner(":app:generateDeepLinkRegistration").build()
@@ -309,7 +345,7 @@ class PerchAggregationPluginTest {
     // Storing an entry only proves the state was serializable; reusing it proves the task runs
     // from that state, with no `Project` to fall back on.
     File(projectDir.root, "alpha/manifests/perch-manifest-alpha.txt")
-      .writeText("/gamma|com.acme.alpha.GammaLink|com.acme.alpha")
+      .writeText("/gamma|com.acme.alpha.GammaLink|com.acme.alpha|com.acme.routes.AppRoute")
     val second = runner(":app:generateDeepLinkRegistration").build()
 
     assertTrue(second.output, second.output.contains("Reusing configuration cache"))
@@ -320,7 +356,7 @@ class PerchAggregationPluginTest {
   @Test
   fun `discovers manifests with isolated projects enabled`() {
     fixture("alpha", "app")
-    producer("alpha", "/alpha|com.acme.alpha.AlphaLink|com.acme.alpha")
+    producer("alpha", "/alpha|com.acme.alpha.AlphaLink|com.acme.alpha|com.acme.routes.AppRoute")
     consumer(implementation("alpha"))
 
     val result = runner(":app:generateDeepLinkRegistration", ISOLATED_PROJECTS).build()
