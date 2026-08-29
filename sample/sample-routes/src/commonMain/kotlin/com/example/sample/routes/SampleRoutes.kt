@@ -4,16 +4,12 @@ import dev.carcara.perch.DeepLinkTarget
 import io.ktor.resources.Resource
 import kotlinx.serialization.Serializable
 
-/** An open route: reachable without a signed-in user. */
+/** A route with no path parameters. */
 @Serializable
 @Resource("/home")
-public class HomeLink : DeepLinkTarget {
-  override val requiresAuth: Boolean get() = false
-}
+public class HomeLink : DeepLinkTarget
 
-/** A gated route carrying a path parameter, to prove parameters survive the pipeline. */
+/** A route carrying a path parameter, to prove parameters survive the pipeline. */
 @Serializable
 @Resource("/payments/{id}")
-public class PaymentLink(public val id: String) : DeepLinkTarget {
-  override val requiresAuth: Boolean get() = true
-}
+public class PaymentLink(public val id: String) : DeepLinkTarget

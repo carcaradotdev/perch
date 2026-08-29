@@ -1,31 +1,8 @@
-public abstract interface class dev/carcara/perch/DeepLinkAuthGate {
-	public static final field AlwaysAuthenticated Ldev/carcara/perch/DeepLinkAuthGate$AlwaysAuthenticated;
-	public abstract fun isAuthenticated ()Lkotlinx/coroutines/flow/StateFlow;
-}
-
-public final class dev/carcara/perch/DeepLinkAuthGate$AlwaysAuthenticated : dev/carcara/perch/DeepLinkAuthGate {
-	public fun isAuthenticated ()Lkotlinx/coroutines/flow/StateFlow;
-}
-
-public abstract interface class dev/carcara/perch/DeepLinkBootstrapState {
-	public abstract fun getBootstrapTakenOver ()Lkotlinx/coroutines/flow/StateFlow;
-	public abstract fun isProcessingDeepLink ()Lkotlinx/coroutines/flow/StateFlow;
-}
-
 public final class dev/carcara/perch/DeepLinkCollisionException : java/lang/IllegalStateException {
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
 	public final fun getExistingRoute ()Ljava/lang/String;
 	public final fun getNewRoute ()Ljava/lang/String;
 	public final fun getPattern ()Ljava/lang/String;
-}
-
-public abstract interface class dev/carcara/perch/DeepLinkLockGate {
-	public static final field AlwaysUnlocked Ldev/carcara/perch/DeepLinkLockGate$AlwaysUnlocked;
-	public abstract fun isUnlocked ()Lkotlinx/coroutines/flow/StateFlow;
-}
-
-public final class dev/carcara/perch/DeepLinkLockGate$AlwaysUnlocked : dev/carcara/perch/DeepLinkLockGate {
-	public fun isUnlocked ()Lkotlinx/coroutines/flow/StateFlow;
 }
 
 public abstract interface class dev/carcara/perch/DeepLinkLogger {
@@ -37,26 +14,6 @@ public final class dev/carcara/perch/DeepLinkLogger$Companion {
 	public final fun getNone ()Ldev/carcara/perch/DeepLinkLogger;
 }
 
-public final class dev/carcara/perch/DeepLinkManager : dev/carcara/perch/DeepLinkBootstrapState {
-	public fun <init> (Ldev/carcara/perch/DeepLinkNavigator;Ldev/carcara/perch/DeepLinkParser;Lkotlinx/coroutines/CoroutineScope;Ldev/carcara/perch/DeepLinkAuthGate;Ldev/carcara/perch/DeepLinkLockGate;Ljava/util/Map;Lkotlinx/coroutines/CoroutineDispatcher;Ldev/carcara/perch/DeepLinkLogger;)V
-	public synthetic fun <init> (Ldev/carcara/perch/DeepLinkNavigator;Ldev/carcara/perch/DeepLinkParser;Lkotlinx/coroutines/CoroutineScope;Ldev/carcara/perch/DeepLinkAuthGate;Ldev/carcara/perch/DeepLinkLockGate;Ljava/util/Map;Lkotlinx/coroutines/CoroutineDispatcher;Ldev/carcara/perch/DeepLinkLogger;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun clearPendingRoute ()V
-	public fun getBootstrapTakenOver ()Lkotlinx/coroutines/flow/StateFlow;
-	public final fun getPendingRoute ()Lkotlinx/coroutines/flow/StateFlow;
-	public final fun handleDeepLink (Ljava/lang/String;)Z
-	public final fun handleRoute (Ldev/carcara/perch/DeepLinkTarget;)V
-	public fun isProcessingDeepLink ()Lkotlinx/coroutines/flow/StateFlow;
-	public final fun setNavigationReady ()V
-}
-
-public abstract interface class dev/carcara/perch/DeepLinkNavigator {
-	public abstract fun currentTargetClass ()Lkotlin/reflect/KClass;
-	public abstract fun present (Ldev/carcara/perch/DeepLinkTarget;)V
-	public abstract fun push (Ldev/carcara/perch/DeepLinkTarget;)V
-	public abstract fun replace (Ldev/carcara/perch/DeepLinkTarget;)V
-	public abstract fun setRoot (Ldev/carcara/perch/DeepLinkTarget;)V
-}
-
 public final class dev/carcara/perch/DeepLinkParser {
 	public fun <init> (Ljava/util/Set;Ljava/util/Set;Ldev/carcara/perch/DeepLinkLogger;)V
 	public synthetic fun <init> (Ljava/util/Set;Ljava/util/Set;Ldev/carcara/perch/DeepLinkLogger;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -66,86 +23,7 @@ public final class dev/carcara/perch/DeepLinkParser {
 	public final fun register (Lkotlinx/serialization/KSerializer;)V
 }
 
-public abstract interface class dev/carcara/perch/DeepLinkResolution {
-}
-
-public final class dev/carcara/perch/DeepLinkResolution$Cancel : dev/carcara/perch/DeepLinkResolution {
-	public static final field INSTANCE Ldev/carcara/perch/DeepLinkResolution$Cancel;
-	public fun equals (Ljava/lang/Object;)Z
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class dev/carcara/perch/DeepLinkResolution$Fallback : dev/carcara/perch/DeepLinkResolution$Navigable {
-	public fun <init> (Ldev/carcara/perch/DeepLinkTarget;Ldev/carcara/perch/NavigationMode;)V
-	public synthetic fun <init> (Ldev/carcara/perch/DeepLinkTarget;Ldev/carcara/perch/NavigationMode;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Ldev/carcara/perch/DeepLinkTarget;
-	public final fun component2 ()Ldev/carcara/perch/NavigationMode;
-	public final fun copy (Ldev/carcara/perch/DeepLinkTarget;Ldev/carcara/perch/NavigationMode;)Ldev/carcara/perch/DeepLinkResolution$Fallback;
-	public static synthetic fun copy$default (Ldev/carcara/perch/DeepLinkResolution$Fallback;Ldev/carcara/perch/DeepLinkTarget;Ldev/carcara/perch/NavigationMode;ILjava/lang/Object;)Ldev/carcara/perch/DeepLinkResolution$Fallback;
-	public fun equals (Ljava/lang/Object;)Z
-	public fun getMode ()Ldev/carcara/perch/NavigationMode;
-	public fun getRoute ()Ldev/carcara/perch/DeepLinkTarget;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public abstract interface class dev/carcara/perch/DeepLinkResolution$Navigable : dev/carcara/perch/DeepLinkResolution {
-	public abstract fun getMode ()Ldev/carcara/perch/NavigationMode;
-	public abstract fun getRoute ()Ldev/carcara/perch/DeepLinkTarget;
-}
-
-public final class dev/carcara/perch/DeepLinkResolution$Resolved : dev/carcara/perch/DeepLinkResolution$Navigable {
-	public fun <init> (Ldev/carcara/perch/DeepLinkTarget;Ldev/carcara/perch/NavigationMode;)V
-	public synthetic fun <init> (Ldev/carcara/perch/DeepLinkTarget;Ldev/carcara/perch/NavigationMode;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Ldev/carcara/perch/DeepLinkTarget;
-	public final fun component2 ()Ldev/carcara/perch/NavigationMode;
-	public final fun copy (Ldev/carcara/perch/DeepLinkTarget;Ldev/carcara/perch/NavigationMode;)Ldev/carcara/perch/DeepLinkResolution$Resolved;
-	public static synthetic fun copy$default (Ldev/carcara/perch/DeepLinkResolution$Resolved;Ldev/carcara/perch/DeepLinkTarget;Ldev/carcara/perch/NavigationMode;ILjava/lang/Object;)Ldev/carcara/perch/DeepLinkResolution$Resolved;
-	public fun equals (Ljava/lang/Object;)Z
-	public fun getMode ()Ldev/carcara/perch/NavigationMode;
-	public fun getRoute ()Ldev/carcara/perch/DeepLinkTarget;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public abstract interface class dev/carcara/perch/DeepLinkRouteHandler {
-	public abstract fun handle (Ldev/carcara/perch/DeepLinkTarget;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-}
-
 public abstract interface class dev/carcara/perch/DeepLinkTarget {
-	public abstract fun getRequiresAuth ()Z
-}
-
-public abstract class dev/carcara/perch/NavigationMode {
-}
-
-public final class dev/carcara/perch/NavigationMode$Present : dev/carcara/perch/NavigationMode {
-	public static final field INSTANCE Ldev/carcara/perch/NavigationMode$Present;
-	public fun equals (Ljava/lang/Object;)Z
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class dev/carcara/perch/NavigationMode$Push : dev/carcara/perch/NavigationMode {
-	public static final field INSTANCE Ldev/carcara/perch/NavigationMode$Push;
-	public fun equals (Ljava/lang/Object;)Z
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class dev/carcara/perch/NavigationMode$Replace : dev/carcara/perch/NavigationMode {
-	public static final field INSTANCE Ldev/carcara/perch/NavigationMode$Replace;
-	public fun equals (Ljava/lang/Object;)Z
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class dev/carcara/perch/NavigationMode$SetRoot : dev/carcara/perch/NavigationMode {
-	public static final field INSTANCE Ldev/carcara/perch/NavigationMode$SetRoot;
-	public fun equals (Ljava/lang/Object;)Z
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
 }
 
 public final class dev/carcara/perch/PathPatternKt {

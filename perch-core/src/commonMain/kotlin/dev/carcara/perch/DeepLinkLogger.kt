@@ -1,8 +1,8 @@
 package dev.carcara.perch
 
 /**
- * Where Perch reports a failure it recovered from: a route with no `@Resource` pattern, or a
- * [DeepLinkRouteHandler] that threw. Adapt your own logger to this; the default discards.
+ * Where Perch reports a failure it recovered from: a route with no `@Resource` pattern. Adapt your
+ * own logger to this; the default discards.
  */
 public fun interface DeepLinkLogger {
   public fun error(message: String, throwable: Throwable?)

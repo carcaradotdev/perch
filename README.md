@@ -1,10 +1,9 @@
 # Perch
 
-Perch is a type-safe deep-link library for Kotlin Multiplatform. You declare routes as ordinary
-Kotlin classes, and Perch turns them into a parser that resolves a URL to one of those classes (or
-`null`), a builder that turns a route back into a URL, and — through its Gradle plugins — a
-generated registration that finds every route across your modules without you listing them by
-hand.
+Perch is a type-safe deep-link library for Kotlin Multiplatform. Annotate a route class, apply two
+Gradle plugins, and Perch generates the code that maps a URL to that class — or to `null`, if
+nothing matches. What to do with the typed target it hands back — whether and how to navigate — is
+your app's decision, not Perch's.
 
 ## Installation
 
@@ -64,15 +63,12 @@ The library coordinates:
 
 | Artifact | Contains |
 | --- | --- |
-| `dev.carcara.perch:perch-core` | `DeepLinkParser`, `DeepLinkManager`, `DeepLinkTarget`, gates, navigator interface |
-| `dev.carcara.perch:perch-test` | Test fakes: `RecordingDeepLinkNavigator`, `FakeDeepLinkAuthGate`, `FakeDeepLinkLockGate` |
-| `dev.carcara.perch:perch-metro` | Metro DI bindings for `DeepLinkManager` |
+| `dev.carcara.perch:perch-core` | `DeepLinkTarget`, `DeepLinkParser`, `DeepLinkLogger` |
 | `dev.carcara.perch:perch-ksp` | The KSP processor; `dev.carcara.perch` adds it for you, so nothing in your build names it |
 
-`perch-core`, `perch-test` and `perch-metro` are Kotlin Multiplatform. `perch-ksp` is a plain
-Kotlin/JVM module, not Multiplatform at all — KSP processors run on the JVM regardless of the
-targets of the module they process, so it does not need to be. All four are version
-`0.1.0-SNAPSHOT`.
+`perch-core` is Kotlin Multiplatform. `perch-ksp` is a plain Kotlin/JVM module, not Multiplatform at
+all — KSP processors run on the JVM regardless of the targets of the module they process, so it
+does not need to be. Both are version `0.1.0-SNAPSHOT`.
 
 ## Quick start
 
@@ -122,15 +118,11 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 @Resource("/home")
-class HomeLink : DeepLinkTarget {
-    override val requiresAuth: Boolean get() = false
-}
+class HomeLink : DeepLinkTarget
 
 @Serializable
 @Resource("/payments/{id}")
-class PaymentLink(val id: String) : DeepLinkTarget {
-    override val requiresAuth: Boolean get() = true
-}
+class PaymentLink(val id: String) : DeepLinkTarget
 ```
 
 That is the whole KSP contract: **a class annotated `@Resource` that implements `DeepLinkTarget`,
@@ -201,43 +193,9 @@ when (val target = appParser().parse("myapp://payments/abc123")) {
 }
 ```
 
-That already resolves a deep link into a typed route. For gated navigation — auth, an unlock
-screen, cold-start handling, custom async resolution before landing on a target — construct a
-`DeepLinkManager` instead of calling `parse` directly. It takes your own `DeepLinkNavigator`
-adapter over your app's real navigation stack; a minimal one that only prints looks like this:
-
-```kotlin
-import dev.carcara.perch.DeepLinkManager
-import dev.carcara.perch.DeepLinkNavigator
-import dev.carcara.perch.DeepLinkTarget
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlin.reflect.KClass
-
-class PrintingNavigator : DeepLinkNavigator {
-    override fun push(target: DeepLinkTarget) = println("push $target")
-    override fun replace(target: DeepLinkTarget) = println("replace $target")
-    override fun setRoot(target: DeepLinkTarget) = println("setRoot $target")
-    override fun present(target: DeepLinkTarget) = println("present $target")
-    override fun currentTargetClass(): KClass<out DeepLinkTarget>? = null
-}
-
-val manager = DeepLinkManager(
-    navigator = PrintingNavigator(), // your app supplies a real DeepLinkNavigator
-    parser = appParser(),
-    scope = CoroutineScope(Dispatchers.Main),
-)
-manager.setNavigationReady() // once your root navigation stack has been mounted
-manager.handleDeepLink("myapp://payments/abc123")
-```
-
-(`perch-test`'s `RecordingDeepLinkNavigator` is a ready-made equivalent for your own tests — see
-the coordinates table above.)
-
-`DeepLinkManager` defaults `authGate` and `lockGate` to always-open, so a route with
-`requiresAuth = true` navigates immediately until you supply your own `DeepLinkAuthGate`/
-`DeepLinkLockGate`. See `DeepLinkManager`'s KDoc for route handlers, navigation modes, and the
-cold-start/warm-start distinction.
+That is the whole surface: a typed target, or `null`. Deciding when to act on it, how to navigate,
+and whether the user is allowed to land there is your app's own logic, sitting on top of whatever
+navigation library you already use.
 
 ## The codegen pipeline
 
@@ -279,43 +237,6 @@ even if discovery found it. The failure mode is silent — the deep link just ne
 error anywhere — so if a route is missing from `registerAllDeepLinks()`, check which source set its
 module depends on the producer from.
 
-## Metro
-
-`perch-metro` provides Metro DI bindings for `DeepLinkManager`: apply `dev.zacsweers.metro` and
-depend on `perch-metro`, and `DeepLinkBindings` contributes a `@SingleIn(AppScope::class)`
-`DeepLinkManager` to your graph. You still provide `DeepLinkNavigator`, `DeepLinkParser`,
-`CoroutineScope`, `DeepLinkAuthGate` and `DeepLinkLockGate` yourself — those are app-specific, and
-Metro fails the graph at compile time if any is missing rather than at runtime:
-
-```kotlin
-@DependencyGraph(AppScope::class)
-interface AppGraph {
-    val bootstrapState: DeepLinkBootstrapState
-
-    @DependencyGraph.Factory
-    interface Factory {
-        fun create(
-            @Provides navigator: DeepLinkNavigator,
-            @Provides parser: DeepLinkParser,
-            @Provides scope: CoroutineScope,
-            @Provides authGate: DeepLinkAuthGate,
-            @Provides lockGate: DeepLinkLockGate,
-        ): AppGraph
-    }
-}
-```
-
-Route handlers are an optional empty-allowed multibinding — register one with `@IntoMap` and
-`DeepLinkRouteKey(YourRoute::class)`, or provide none at all.
-
-**A `perch-metro` consumer links against Metro-generated types that are not covered by Perch's
-binary-compatibility guarantee.** `perch-metro`'s tracked public API excludes the classes Metro's
-compiler plugin generates for cross-module graph wiring (its `*Factory` types and related
-bind-mirror classes). Your code still links against those generated types at compile time, and
-they are not covered by this library's binary-compatibility guarantee — they follow Metro's own
-compatibility contract, not Perch's. A Metro major-version upgrade can change or remove them
-independently of any change to Perch's own API.
-
 ## Schemes, hosts, and why hosts are required for `http`/`https`
 
 `DeepLinkParser` takes a set of `schemes` and, optionally, a set of `hosts`:
@@ -335,8 +256,8 @@ supply one.
 
 ## Status
 
-Every module publishes to `mavenLocal()`, including both Gradle plugin markers, and the four
-library modules are under a binary-compatibility (`apiCheck`/`apiDump`) guard. Maven Central
+`perch-core` and `perch-ksp` publish to `mavenLocal()`, alongside both Gradle plugin markers, and
+both library modules are under a binary-compatibility (`apiCheck`/`apiDump`) guard. Maven Central
 publishing is not yet wired up — it needs a Sonatype Central Portal account, a verified
 `dev.carcara` namespace, and a GPG key, on top of the publishing already in place.
 
@@ -359,5 +280,5 @@ introduced a lint violation. Test sources are not linted. It also builds and tes
 which exercises the whole KSP and aggregation pipeline end to end; if a change to either plugin
 breaks the pipeline, the sample is what notices.
 
-CI (`.github/workflows/ci.yml`) runs all three commands above on every pull request, on `macos-15`
-— the Apple targets do not build on other runner images.
+Nothing runs them for you: there is no CI yet. Run all three before opening a pull request, on
+macOS — the Apple targets do not build on other platforms.

@@ -42,15 +42,11 @@ class DeepLinkProcessorTest {
 
     @Serializable
     @Resource("/home")
-    class HomeLink : DeepLinkTarget {
-      override val requiresAuth: Boolean get() = false
-    }
+    class HomeLink : DeepLinkTarget
 
     @Serializable
     @Resource("/payments/{id}")
-    class PaymentLink(val id: String) : DeepLinkTarget {
-      override val requiresAuth: Boolean get() = true
-    }
+    class PaymentLink(val id: String) : DeepLinkTarget
 
     class NotADeepLink
     """,
@@ -125,10 +121,10 @@ class DeepLinkProcessorTest {
       import kotlinx.serialization.Serializable
 
       @Serializable @Resource("/thing/{id}")
-      class First(val id: String) : DeepLinkTarget { override val requiresAuth get() = false }
+      class First(val id: String) : DeepLinkTarget
 
       @Serializable @Resource("/thing/{name}")
-      class Second(val name: String) : DeepLinkTarget { override val requiresAuth get() = false }
+      class Second(val name: String) : DeepLinkTarget
       """,
     )
 
@@ -165,9 +161,7 @@ class DeepLinkProcessorTest {
 
       @Serializable
       @Resource("/a/details")
-      class Details : DeepLinkTarget {
-        override val requiresAuth: Boolean get() = false
-      }
+      class Details : DeepLinkTarget
       """,
     )
     val second = SourceFile.kotlin(
@@ -181,9 +175,7 @@ class DeepLinkProcessorTest {
 
       @Serializable
       @Resource("/b/details")
-      class Details : DeepLinkTarget {
-        override val requiresAuth: Boolean get() = false
-      }
+      class Details : DeepLinkTarget
       """,
     )
 

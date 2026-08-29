@@ -467,44 +467,40 @@ class DeepLinkParserTest {
   }
 }
 
-abstract class TestDeepLinkTarget : DeepLinkTarget {
-  override val requiresAuth: Boolean = true
-}
-
 // A serializable deep-link target with no @Resource — the shape a stale generated registration
 // produces when a route's @Resource is removed but its module's manifest still lists it.
 @Serializable
-data object RouteWithoutResource : TestDeepLinkTarget()
+data object RouteWithoutResource : DeepLinkTarget
 
 @Serializable
 @Resource("/payments/{id}")
-data class PaymentDeepLink(val id: String) : TestDeepLinkTarget()
+data class PaymentDeepLink(val id: String) : DeepLinkTarget
 
 @Serializable
 @Resource("/transactions/{id}/details")
-data class TransactionDetailDeepLink(val id: String) : TestDeepLinkTarget()
+data class TransactionDetailDeepLink(val id: String) : DeepLinkTarget
 
 @Serializable
 @Resource("/search")
 data class SearchDeepLink(
   val query: String,
   val limit: Int = 20,
-) : TestDeepLinkTarget()
+) : DeepLinkTarget
 
 @Serializable
 @Resource("/profile/{userId?}")
-data class ProfileDeepLink(val userId: String? = null) : TestDeepLinkTarget()
+data class ProfileDeepLink(val userId: String? = null) : DeepLinkTarget
 
 @Serializable
 @Resource("/orders/{orderId}/items/{itemId}")
 data class OrderItemDeepLink(
   val orderId: String,
   val itemId: String,
-) : TestDeepLinkTarget()
+) : DeepLinkTarget
 
 @Serializable
 @Resource("/home")
-class HomeDeepLink : TestDeepLinkTarget()
+class HomeDeepLink : DeepLinkTarget
 
 // =============================================================================
 // Targets for edge cases and advanced features
@@ -512,51 +508,51 @@ class HomeDeepLink : TestDeepLinkTarget()
 
 @Serializable
 @Resource("/feature/list")
-data object FeatureListNoSlash : TestDeepLinkTarget()
+data object FeatureListNoSlash : DeepLinkTarget
 
 @Serializable
 @Resource("/feature/list/")
-data object FeatureListWithSlash : TestDeepLinkTarget()
+data object FeatureListWithSlash : DeepLinkTarget
 
 @Serializable
 @Resource("/feature/{id}")
-data class FeatureByIdDeepLink(val id: String) : TestDeepLinkTarget()
+data class FeatureByIdDeepLink(val id: String) : DeepLinkTarget
 
 @Serializable
 @Resource("/feature/{name}")
-data class FeatureByNameDeepLink(val name: String) : TestDeepLinkTarget()
+data class FeatureByNameDeepLink(val name: String) : DeepLinkTarget
 
 @Serializable
 @Resource("/feature/details")
-data object FeatureDetailsDeepLink : TestDeepLinkTarget()
+data object FeatureDetailsDeepLink : DeepLinkTarget
 
 @Serializable
 @Resource("/feature/list/details")
-data object FeatureListDetailsDeepLink : TestDeepLinkTarget()
+data object FeatureListDetailsDeepLink : DeepLinkTarget
 
 @Serializable
 @Resource("/transfer/{id}")
 data class TransferDeepLink(
   @kotlinx.serialization.SerialName("id")
   val transferId: String,
-) : TestDeepLinkTarget()
+) : DeepLinkTarget
 
 @Serializable
 @Resource("/articles")
-data class ArticlesDeepLink(val sort: String? = "new") : TestDeepLinkTarget() {
+data class ArticlesDeepLink(val sort: String? = "new") : DeepLinkTarget {
   @Serializable
   @Resource("new")
-  data class New(val parent: ArticlesDeepLink = ArticlesDeepLink()) : TestDeepLinkTarget()
+  data class New(val parent: ArticlesDeepLink = ArticlesDeepLink()) : DeepLinkTarget
 
   @Serializable
   @Resource("{id}")
   data class ById(
     val parent: ArticlesDeepLink = ArticlesDeepLink(),
     val id: Long,
-  ) : TestDeepLinkTarget() {
+  ) : DeepLinkTarget {
     @Serializable
     @Resource("edit")
-    data class Edit(val parent: ById) : TestDeepLinkTarget()
+    data class Edit(val parent: ById) : DeepLinkTarget
   }
 }
 
@@ -566,4 +562,4 @@ data class ItemsDeepLink(
   val page: Int = 1,
   val limit: Int = 20,
   val filter: String? = null,
-) : TestDeepLinkTarget()
+) : DeepLinkTarget
