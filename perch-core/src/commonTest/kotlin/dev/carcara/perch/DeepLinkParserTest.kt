@@ -1,6 +1,5 @@
 package dev.carcara.perch
 
-import io.ktor.resources.Resource
 import kotlinx.serialization.Serializable
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -113,11 +112,11 @@ class DeepLinkParserTest {
   }
 
   @Test
-  fun `register skips a route with no Resource annotation instead of crashing`() {
-    // A serializable Route whose @Resource was removed but is still registered via a stale
+  fun `register skips a route with no DeepLink annotation instead of crashing`() {
+    // A serializable Route whose @DeepLink was removed but is still registered via a stale
     // generated registration. encodeToPathPattern throws on it; registration must not crash.
     val subject = parser()
-    subject.register<RouteWithoutResource>()
+    subject.register<RouteWithoutAnnotation>()
 
     assertNull(subject.parse("acme://anything"))
   }
@@ -125,7 +124,7 @@ class DeepLinkParserTest {
   @Test
   fun `a bad route does not block registration of valid routes`() {
     val subject = parser()
-    subject.register<RouteWithoutResource>()
+    subject.register<RouteWithoutAnnotation>()
     subject.register<PaymentDeepLink>()
 
     val result = subject.parse("acme://payments/abc123")
@@ -216,6 +215,34 @@ class DeepLinkParserTest {
 
     assertIs<PaymentDeepLink>(parsed)
     assertEquals(original.id, parsed.id)
+  }
+
+  @Test
+  fun `roundtrip of a value that has to be percent-encoded`() {
+    val subject = parser()
+    subject.register<PaymentDeepLink>()
+    val original = PaymentDeepLink("a b/c é")
+
+    val url = subject.toUrl(original)
+    val parsed = subject.parse(url)
+
+    // The slash is encoded, so it stays inside the id instead of splitting it into two segments.
+    assertEquals("acme://payments/a%20b%2Fc%20%C3%A9", url)
+    assertIs<PaymentDeepLink>(parsed)
+    assertEquals(original.id, parsed.id)
+  }
+
+  @Test
+  fun `roundtrip of a query value that has to be percent-encoded`() {
+    val subject = parser()
+    subject.register<SearchDeepLink>()
+    val original = SearchDeepLink(query = "a&b=c", limit = 5)
+
+    val parsed = subject.parse(subject.toUrl(original))
+
+    assertIs<SearchDeepLink>(parsed)
+    assertEquals(original.query, parsed.query)
+    assertEquals(5, parsed.limit)
   }
 
   @Test
@@ -467,97 +494,79 @@ class DeepLinkParserTest {
   }
 }
 
-// A serializable deep-link target with no @Resource — the shape a stale generated registration
-// produces when a route's @Resource is removed but its module's manifest still lists it.
+// A serializable deep-link target with no @DeepLink — the shape a stale generated registration
+// produces when a route's @DeepLink is removed but its module's manifest still lists it.
 @Serializable
-data object RouteWithoutResource : DeepLinkTarget
+data object RouteWithoutAnnotation : DeepLinkTarget
 
-@Serializable
-@Resource("/payments/{id}")
+@DeepLink("/payments/{id}")
 data class PaymentDeepLink(val id: String) : DeepLinkTarget
 
-@Serializable
-@Resource("/transactions/{id}/details")
+@DeepLink("/transactions/{id}/details")
 data class TransactionDetailDeepLink(val id: String) : DeepLinkTarget
 
-@Serializable
-@Resource("/search")
+@DeepLink("/search")
 data class SearchDeepLink(
   val query: String,
   val limit: Int = 20,
 ) : DeepLinkTarget
 
-@Serializable
-@Resource("/profile/{userId?}")
+@DeepLink("/profile/{userId?}")
 data class ProfileDeepLink(val userId: String? = null) : DeepLinkTarget
 
-@Serializable
-@Resource("/orders/{orderId}/items/{itemId}")
+@DeepLink("/orders/{orderId}/items/{itemId}")
 data class OrderItemDeepLink(
   val orderId: String,
   val itemId: String,
 ) : DeepLinkTarget
 
-@Serializable
-@Resource("/home")
+@DeepLink("/home")
 class HomeDeepLink : DeepLinkTarget
 
 // =============================================================================
 // Targets for edge cases and advanced features
 // =============================================================================
 
-@Serializable
-@Resource("/feature/list")
+@DeepLink("/feature/list")
 data object FeatureListNoSlash : DeepLinkTarget
 
-@Serializable
-@Resource("/feature/list/")
+@DeepLink("/feature/list/")
 data object FeatureListWithSlash : DeepLinkTarget
 
-@Serializable
-@Resource("/feature/{id}")
+@DeepLink("/feature/{id}")
 data class FeatureByIdDeepLink(val id: String) : DeepLinkTarget
 
-@Serializable
-@Resource("/feature/{name}")
+@DeepLink("/feature/{name}")
 data class FeatureByNameDeepLink(val name: String) : DeepLinkTarget
 
-@Serializable
-@Resource("/feature/details")
+@DeepLink("/feature/details")
 data object FeatureDetailsDeepLink : DeepLinkTarget
 
-@Serializable
-@Resource("/feature/list/details")
+@DeepLink("/feature/list/details")
 data object FeatureListDetailsDeepLink : DeepLinkTarget
 
-@Serializable
-@Resource("/transfer/{id}")
+@DeepLink("/transfer/{id}")
 data class TransferDeepLink(
   @kotlinx.serialization.SerialName("id")
   val transferId: String,
 ) : DeepLinkTarget
 
-@Serializable
-@Resource("/articles")
+@DeepLink("/articles")
 data class ArticlesDeepLink(val sort: String? = "new") : DeepLinkTarget {
-  @Serializable
-  @Resource("new")
+  @DeepLink("new")
   data class New(val parent: ArticlesDeepLink = ArticlesDeepLink()) : DeepLinkTarget
 
-  @Serializable
-  @Resource("{id}")
+  @DeepLink("{id}")
   data class ById(
     val parent: ArticlesDeepLink = ArticlesDeepLink(),
     val id: Long,
   ) : DeepLinkTarget {
-    @Serializable
-    @Resource("edit")
+    @DeepLink("edit")
     data class Edit(val parent: ById) : DeepLinkTarget
   }
 }
 
-@Serializable
-@Resource("/items")
+@DeepLink("/items")
 data class ItemsDeepLink(
   val page: Int = 1,
   val limit: Int = 20,
