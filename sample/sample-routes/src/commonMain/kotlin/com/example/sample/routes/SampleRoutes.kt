@@ -1,15 +1,14 @@
 package com.example.sample.routes
 
 import dev.carcara.perch.DeepLink
-import dev.carcara.perch.DeepLinkTarget
 
-// No `@Serializable` on either class: `@DeepLink` is `@MetaSerializable`, so the serialisation
-// plugin generates the serialiser from it alone.
+// The annotation is the whole contract: neither route implements anything, and no `@Serializable`
+// is needed because `@DeepLink` is `@MetaSerializable`.
 
 /** A route with no path parameters. */
 @DeepLink("/home")
-public class HomeLink : DeepLinkTarget
+public class HomeLink
 
 /** A route carrying a path parameter, to prove parameters survive the pipeline. */
 @DeepLink("/payments/{id}")
-public class PaymentLink(public val id: String) : DeepLinkTarget
+public class PaymentLink(public val id: String)

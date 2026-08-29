@@ -63,7 +63,7 @@ The library coordinates:
 
 | Artifact | Contains |
 | --- | --- |
-| `dev.carcara.perch:perch-core` | `@DeepLink`, `DeepLinkTarget`, `DeepLinkParser`, `DeepLinkLogger` |
+| `dev.carcara.perch:perch-core` | `@DeepLink`, `DeepLinkParser`, `DeepLinkLogger` |
 | `dev.carcara.perch:perch-ksp` | The KSP processor; `dev.carcara.perch` adds it for you, so nothing in your build names it |
 
 `perch-core` is Kotlin Multiplatform and depends on `kotlinx-serialization-core` and nothing else.
@@ -108,29 +108,29 @@ perch {
 }
 ```
 
-Then declare routes as classes annotated `@DeepLink` that implement `DeepLinkTarget`:
+Then declare routes as classes annotated `@DeepLink`:
 
 ```kotlin
 package com.example.routes
 
 import dev.carcara.perch.DeepLink
-import dev.carcara.perch.DeepLinkTarget
 
 @DeepLink("/home")
-class HomeLink : DeepLinkTarget
+class HomeLink
 
 @DeepLink("/payments/{id}")
-class PaymentLink(val id: String) : DeepLinkTarget
+class PaymentLink(val id: String)
 ```
 
-No `@Serializable` on either: `@DeepLink` is `@MetaSerializable`, so the kotlinx.serialization
-compiler plugin generates the serialiser from it alone.
+The annotation is the whole thing. A route implements no interface of Perch's, and needs no
+`@Serializable` either: `@DeepLink` is `@MetaSerializable`, so the kotlinx.serialization compiler
+plugin generates the serialiser from it alone.
 
-That is the whole KSP contract: **a class annotated `@DeepLink` that implements `DeepLinkTarget`,
-in the sources of a module applying `dev.carcara.perch`, becomes a registered route.** Nothing
-else registers it, and nothing outside that module's own sources is scanned. If your app also uses
-Ktor's type-safe client, its `@Resource` classes are HTTP resources and not deep links; Perch reads
-`@DeepLink` only, so the two never collide.
+That is the whole KSP contract: **a class annotated `@DeepLink`, in the sources of a module applying
+`dev.carcara.perch`, becomes a registered route.** Nothing else registers it, and nothing outside
+that module's own sources is scanned. If your app also uses Ktor's type-safe client, its `@Resource`
+classes are HTTP resources and not deep links; Perch reads `@DeepLink` only, so the two never
+collide.
 
 ### 2. Aggregate them
 
@@ -192,11 +192,27 @@ fun appParser(): DeepLinkParser =
 when (val target = appParser().parse("myapp://payments/abc123")) {
     is PaymentLink -> println("Navigate to payment ${target.id}")
     is HomeLink -> println("Navigate home")
-    null -> println("Not a Perch route")
+    else -> println("Not a Perch route")
 }
 ```
 
-That is the whole surface: a typed target, or `null`. Deciding when to act on it, how to navigate,
+`parse` returns `Any?`, because Perch does not decide what your routes have in common. If you group
+them under a sealed type of your own, narrow once and the `when` is exhaustive with no `else`:
+
+```kotlin
+sealed interface Route
+
+@DeepLink("/home")
+class HomeLink : Route
+
+when (val target = appParser().parse(url) as? Route) {
+    is PaymentLink -> ...
+    is HomeLink -> ...
+    null -> ...
+}
+```
+
+That is the whole surface: a route object, or `null`. Deciding when to act on it, how to navigate,
 and whether the user is allowed to land there is your app's own logic, sitting on top of whatever
 navigation library you already use.
 

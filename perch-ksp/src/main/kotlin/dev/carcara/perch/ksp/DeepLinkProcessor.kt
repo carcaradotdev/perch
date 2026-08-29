@@ -7,15 +7,14 @@ import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSClassDeclaration
-import com.google.devtools.ksp.symbol.KSType
 import java.io.OutputStreamWriter
 
 /**
  * KSP processor that generates a `registerDeepLinks()` extension on the module's parser.
  *
- * The rule is one sentence: a class in this module's own sources, annotated
- * `@dev.carcara.perch.DeepLink`, that implements the configured target base class, is a route.
- * The processor never looks outside the module it runs on.
+ * The rule is one sentence: a class in this module's own sources annotated
+ * `@dev.carcara.perch.DeepLink` is a route. There is no supertype to implement and nothing else to
+ * satisfy, and the processor never looks outside the module it runs on.
  */
 internal class DeepLinkProcessor(
   private val codeGenerator: CodeGenerator,
@@ -25,11 +24,9 @@ internal class DeepLinkProcessor(
 
   private companion object {
     private const val DEEP_LINK_ANNOTATION = "dev.carcara.perch.DeepLink"
-    private const val DEFAULT_TARGET_BASE_CLASS = "dev.carcara.perch.DeepLinkTarget"
     private const val DEFAULT_PARSER_CLASS = "dev.carcara.perch.DeepLinkParser"
   }
 
-  private val targetBaseClass = options["perch.targetBaseClass"] ?: DEFAULT_TARGET_BASE_CLASS
   private val parserClass = options["perch.parserClass"] ?: DEFAULT_PARSER_CLASS
 
   private var processed = false
@@ -59,7 +56,7 @@ internal class DeepLinkProcessor(
     classDecl: KSClassDeclaration,
     result: MutableSet<KSClassDeclaration>,
   ) {
-    if (hasDeepLinkAnnotation(classDecl) && extendsRoute(classDecl)) {
+    if (hasDeepLinkAnnotation(classDecl)) {
       result.add(classDecl)
     }
 
@@ -72,23 +69,6 @@ internal class DeepLinkProcessor(
 
   private fun hasDeepLinkAnnotation(classDecl: KSClassDeclaration): Boolean = classDecl.annotations.any { annotation ->
     annotation.annotationType.resolve().declaration.qualifiedName?.asString() == DEEP_LINK_ANNOTATION
-  }
-
-  private fun extendsRoute(classDecl: KSClassDeclaration): Boolean = classDecl.superTypes.any { superType ->
-    isOrExtendsRoute(superType.resolve())
-  }
-
-  private fun isOrExtendsRoute(type: KSType): Boolean {
-    val declaration = type.declaration as? KSClassDeclaration ?: return false
-    val qualifiedName = declaration.qualifiedName?.asString()
-
-    if (qualifiedName == targetBaseClass) {
-      return true
-    }
-
-    return declaration.superTypes.any { superType ->
-      isOrExtendsRoute(superType.resolve())
-    }
   }
 
   private fun generateRegistrationFile(packageName: String, routeClasses: List<KSClassDeclaration>) {

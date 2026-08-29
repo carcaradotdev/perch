@@ -36,14 +36,13 @@ class DeepLinkProcessorTest {
     """
     package com.acme.home
 
-    import dev.carcara.perch.DeepLinkTarget
     import dev.carcara.perch.DeepLink
 
     @DeepLink("/home")
-    class HomeLink : DeepLinkTarget
+    class HomeLink
 
     @DeepLink("/payments/{id}")
-    class PaymentLink(val id: String) : DeepLinkTarget
+    class PaymentLink(val id: String)
 
     class NotADeepLink
     """,
@@ -84,41 +83,19 @@ class DeepLinkProcessorTest {
   }
 
   @Test
-  fun `a class with DeepLink but not DeepLinkTarget is ignored`() {
-    val source = SourceFile.kotlin(
-      "Other.kt",
-      """
-      package com.acme.home
-
-      import dev.carcara.perch.DeepLink
-
-      @DeepLink("/nope")
-      class NotATarget
-      """,
-    )
-
-    val result = compile(source)
-
-    assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode)
-    val generated = File(result.outputDirectory.parentFile, "ksp/sources/kotlin/com/acme/home/DeepLinkRegistration.kt")
-    assertTrue(!generated.exists())
-  }
-
-  @Test
-  fun `a Ktor Resource on a DeepLinkTarget is not a deep link`() {
+  fun `a Ktor Resource is not a deep link`() {
     // The reason Perch has an annotation of its own. An app that also uses Ktor's type-safe
-    // client annotates HTTP resources with `@Resource`; those are not deep links, and the
-    // processor must not mistake one for a route even when it happens to be a DeepLinkTarget.
+    // client annotates HTTP resources with `@Resource`, and with no other rule to tell the two
+    // apart, every one of those would become a route.
     val source = SourceFile.kotlin(
       "KtorResource.kt",
       """
       package com.acme.home
 
-      import dev.carcara.perch.DeepLinkTarget
       import io.ktor.resources.Resource
 
       @Resource("/api/payments/{id}")
-      class PaymentsApi(val id: String) : DeepLinkTarget
+      class PaymentsApi(val id: String)
       """,
     )
 
@@ -136,14 +113,13 @@ class DeepLinkProcessorTest {
       """
       package com.acme.home
 
-      import dev.carcara.perch.DeepLinkTarget
       import dev.carcara.perch.DeepLink
 
       @DeepLink("/thing/{id}")
-      class First(val id: String) : DeepLinkTarget
+      class First(val id: String)
 
       @DeepLink("/thing/{name}")
-      class Second(val name: String) : DeepLinkTarget
+      class Second(val name: String)
       """,
     )
 
@@ -174,11 +150,10 @@ class DeepLinkProcessorTest {
       """
       package com.acme.a
 
-      import dev.carcara.perch.DeepLinkTarget
       import dev.carcara.perch.DeepLink
 
       @DeepLink("/a/details")
-      class Details : DeepLinkTarget
+      class Details
       """,
     )
     val second = SourceFile.kotlin(
@@ -186,11 +161,10 @@ class DeepLinkProcessorTest {
       """
       package com.acme.b
 
-      import dev.carcara.perch.DeepLinkTarget
       import dev.carcara.perch.DeepLink
 
       @DeepLink("/b/details")
-      class Details : DeepLinkTarget
+      class Details
       """,
     )
 

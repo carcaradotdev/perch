@@ -6,10 +6,13 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.serializer
 
 /**
- * Parses deep-link URLs into type-safe [DeepLinkTarget] objects.
+ * Parses deep-link URLs into route objects.
  *
- * A route is a class annotated [DeepLink], whose path pattern decides which of its properties come
- * out of the path:
+ * A route is a class annotated [DeepLink], and that is the whole requirement: it implements nothing
+ * of Perch's, so [parse] hands back `Any?` and the caller narrows it. A `when` stays exhaustive by
+ * narrowing first, `parse(url) as? Route`, against a sealed type the app owns.
+ *
+ * The path pattern decides which of a route's properties come out of the path:
  * - `{param}` required path parameter
  * - `{param?}` optional path parameter
  * - `{param...}` tailcard, matching the remaining segments
@@ -42,15 +45,18 @@ import kotlinx.serialization.serializer
  * having them resolved away.
  *
  * ```kotlin
+ * @DeepLink("/payments/{id}")
+ * class PaymentLink(val id: String)
+ *
  * val parser = DeepLinkParser(schemes = setOf("acme", "https"), hosts = setOf("acme.com"))
- * parser.register<PaymentDeepLink>()
+ * parser.register<PaymentLink>()
  *
  * when (val link = parser.parse("acme://payments/abc123")) {
- *   is PaymentDeepLink -> navigator.push(link)
+ *   is PaymentLink -> navigator.push(link)
  *   else -> Unit
  * }
  *
- * parser.toUrl(PaymentDeepLink("abc123")) // "acme://payments/abc123"
+ * parser.toUrl(PaymentLink("abc123")) // "acme://payments/abc123"
  * ```
  *
  * Registration is per instance. Two parsers never share routes.
@@ -87,11 +93,13 @@ public class DeepLinkParser(
   private val registeredRoutes = mutableListOf<RegisteredRoute<*>>()
   private val registeredPatterns = mutableMapOf<String, String>()
 
-  public inline fun <reified T : DeepLinkTarget> register() {
+  /** Registers [T] so [parse] can return it. Registering the same route twice is a no-op. */
+  public inline fun <reified T : Any> register() {
     register(serializer<T>())
   }
 
-  public fun <T : DeepLinkTarget> register(serializer: KSerializer<T>) {
+  /** [register] for a serialiser resolved by the caller, rather than reified at the call site. */
+  public fun <T : Any> register(serializer: KSerializer<T>) {
     val routeName = serializer.descriptor.serialName
     // A route with no @DeepLink path pattern cannot be a deep link. This happens when a stale
     // generated registration still names a route whose @DeepLink was removed. Skip it rather
@@ -119,7 +127,7 @@ public class DeepLinkParser(
     registeredRoutes.add(RegisteredRoute(serializer, pathPattern, format))
   }
 
-  public fun parse(url: String): DeepLinkTarget? {
+  public fun parse(url: String): Any? {
     val location = UrlLocation.of(url) ?: return null
     if (location.scheme != null && location.scheme !in schemes) return null
     if (location.host != null && hosts.isNotEmpty() && location.host !in hosts) return null
@@ -146,11 +154,11 @@ public class DeepLinkParser(
    * @throws DeepLinkSerializationException when [deepLink] is not a `@DeepLink` route, or a
    * required placeholder in its path has no value to fill it.
    */
-  public inline fun <reified T : DeepLinkTarget> toUrl(deepLink: T): String =
+  public inline fun <reified T : Any> toUrl(deepLink: T): String =
     toUrl(serializer<T>(), deepLink)
 
   /** [toUrl] for a serialiser resolved by the caller, rather than reified at the call site. */
-  public fun <T : DeepLinkTarget> toUrl(serializer: KSerializer<T>, deepLink: T): String =
+  public fun <T : Any> toUrl(serializer: KSerializer<T>, deepLink: T): String =
     "$urlPrefix${format.encodeToPath(serializer, deepLink)}"
 }
 

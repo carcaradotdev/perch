@@ -19,9 +19,12 @@ import kotlinx.serialization.SerialInfo
  *
  * ```kotlin
  * @DeepLink("/payments/{id}")
- * class PaymentLink(val id: String, val tab: String? = null) : DeepLinkTarget
+ * class PaymentLink(val id: String, val tab: String? = null)
  * // acme://payments/abc123?tab=receipt
  * ```
+ *
+ * The annotation is the whole contract. A route implements no interface of Perch's, and whatever
+ * type the app groups its routes under is its own business.
  *
  * Placeholder forms, matching Ktor's routing conventions:
  * - `{name}` a required path parameter
@@ -33,9 +36,9 @@ import kotlinx.serialization.SerialInfo
  *
  * ```kotlin
  * @DeepLink("/orders")
- * class Orders : DeepLinkTarget {
+ * class Orders {
  *   @DeepLink("/{id}")
- *   class ById(val parent: Orders = Orders(), val id: String) : DeepLinkTarget
+ *   class ById(val parent: Orders = Orders(), val id: String)
  * }
  * ```
  *
