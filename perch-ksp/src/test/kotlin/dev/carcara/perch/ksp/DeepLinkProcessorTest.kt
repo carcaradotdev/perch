@@ -37,15 +37,12 @@ class DeepLinkProcessorTest {
     package com.acme.home
 
     import dev.carcara.perch.DeepLinkTarget
-    import io.ktor.resources.Resource
-    import kotlinx.serialization.Serializable
+    import dev.carcara.perch.DeepLink
 
-    @Serializable
-    @Resource("/home")
+    @DeepLink("/home")
     class HomeLink : DeepLinkTarget
 
-    @Serializable
-    @Resource("/payments/{id}")
+    @DeepLink("/payments/{id}")
     class PaymentLink(val id: String) : DeepLinkTarget
 
     class NotADeepLink
@@ -87,18 +84,41 @@ class DeepLinkProcessorTest {
   }
 
   @Test
-  fun `a class with Resource but not DeepLinkTarget is ignored`() {
+  fun `a class with DeepLink but not DeepLinkTarget is ignored`() {
     val source = SourceFile.kotlin(
       "Other.kt",
       """
       package com.acme.home
 
-      import io.ktor.resources.Resource
-      import kotlinx.serialization.Serializable
+      import dev.carcara.perch.DeepLink
 
-      @Serializable
-      @Resource("/nope")
+      @DeepLink("/nope")
       class NotATarget
+      """,
+    )
+
+    val result = compile(source)
+
+    assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode)
+    val generated = File(result.outputDirectory.parentFile, "ksp/sources/kotlin/com/acme/home/DeepLinkRegistration.kt")
+    assertTrue(!generated.exists())
+  }
+
+  @Test
+  fun `a Ktor Resource on a DeepLinkTarget is not a deep link`() {
+    // The reason Perch has an annotation of its own. An app that also uses Ktor's type-safe
+    // client annotates HTTP resources with `@Resource`; those are not deep links, and the
+    // processor must not mistake one for a route even when it happens to be a DeepLinkTarget.
+    val source = SourceFile.kotlin(
+      "KtorResource.kt",
+      """
+      package com.acme.home
+
+      import dev.carcara.perch.DeepLinkTarget
+      import io.ktor.resources.Resource
+
+      @Resource("/api/payments/{id}")
+      class PaymentsApi(val id: String) : DeepLinkTarget
       """,
     )
 
@@ -117,13 +137,12 @@ class DeepLinkProcessorTest {
       package com.acme.home
 
       import dev.carcara.perch.DeepLinkTarget
-      import io.ktor.resources.Resource
-      import kotlinx.serialization.Serializable
+      import dev.carcara.perch.DeepLink
 
-      @Serializable @Resource("/thing/{id}")
+      @DeepLink("/thing/{id}")
       class First(val id: String) : DeepLinkTarget
 
-      @Serializable @Resource("/thing/{name}")
+      @DeepLink("/thing/{name}")
       class Second(val name: String) : DeepLinkTarget
       """,
     )
@@ -156,11 +175,9 @@ class DeepLinkProcessorTest {
       package com.acme.a
 
       import dev.carcara.perch.DeepLinkTarget
-      import io.ktor.resources.Resource
-      import kotlinx.serialization.Serializable
+      import dev.carcara.perch.DeepLink
 
-      @Serializable
-      @Resource("/a/details")
+      @DeepLink("/a/details")
       class Details : DeepLinkTarget
       """,
     )
@@ -170,11 +187,9 @@ class DeepLinkProcessorTest {
       package com.acme.b
 
       import dev.carcara.perch.DeepLinkTarget
-      import io.ktor.resources.Resource
-      import kotlinx.serialization.Serializable
+      import dev.carcara.perch.DeepLink
 
-      @Serializable
-      @Resource("/b/details")
+      @DeepLink("/b/details")
       class Details : DeepLinkTarget
       """,
     )

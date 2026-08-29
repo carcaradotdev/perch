@@ -1,0 +1,23 @@
+Perch
+Copyright 2026 Carcara
+
+This product includes software developed at JetBrains s.r.o.
+
+The resource serialisation in `perch-core`, under
+`dev.carcara.perch.serialization`, is derived from the `ktor-resources` module
+of Ktor (https://github.com/ktorio/ktor), Copyright 2014-2022 JetBrains s.r.o
+and contributors, licensed under the Apache License, Version 2.0.
+
+Derived files, and the Ktor sources they come from:
+
+  dev/carcara/perch/DeepLink.kt                      io/ktor/resources/Resource.kt
+  dev/carcara/perch/DeepLinkSerializationException.kt io/ktor/resources/ResourceSerializationException.kt
+  dev/carcara/perch/serialization/DeepLinkFormat.kt  io/ktor/resources/serialization/ResourcesFormat.kt
+  dev/carcara/perch/serialization/ParametersEncoder.kt io/ktor/resources/serialization/ParametersEncoder.kt
+  dev/carcara/perch/serialization/ParametersDecoder.kt io/ktor/resources/serialization/Decoders.kt
+  dev/carcara/perch/serialization/PathBuilder.kt     io/ktor/resources/UrlBuilder.kt
+
+The tests in `perch-core/src/commonTest/kotlin/dev/carcara/perch/serialization`
+are derived from the tests of the same module.
+
+A copy of the Apache License, Version 2.0 is in LICENSE.

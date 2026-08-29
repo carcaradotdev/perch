@@ -63,12 +63,13 @@ The library coordinates:
 
 | Artifact | Contains |
 | --- | --- |
-| `dev.carcara.perch:perch-core` | `DeepLinkTarget`, `DeepLinkParser`, `DeepLinkLogger` |
+| `dev.carcara.perch:perch-core` | `@DeepLink`, `DeepLinkTarget`, `DeepLinkParser`, `DeepLinkLogger` |
 | `dev.carcara.perch:perch-ksp` | The KSP processor; `dev.carcara.perch` adds it for you, so nothing in your build names it |
 
-`perch-core` is Kotlin Multiplatform. `perch-ksp` is a plain Kotlin/JVM module, not Multiplatform at
-all — KSP processors run on the JVM regardless of the targets of the module they process, so it
-does not need to be. Both are version `0.1.0-SNAPSHOT`.
+`perch-core` is Kotlin Multiplatform and depends on `kotlinx-serialization-core` and nothing else.
+`perch-ksp` is a plain Kotlin/JVM module, not Multiplatform at all — KSP processors run on the JVM
+regardless of the targets of the module they process, so it does not need to be. Both are version
+`0.1.0-SNAPSHOT`.
 
 ## Quick start
 
@@ -107,27 +108,29 @@ perch {
 }
 ```
 
-Then declare routes as classes annotated `@Resource` that implement `DeepLinkTarget`:
+Then declare routes as classes annotated `@DeepLink` that implement `DeepLinkTarget`:
 
 ```kotlin
 package com.example.routes
 
+import dev.carcara.perch.DeepLink
 import dev.carcara.perch.DeepLinkTarget
-import io.ktor.resources.Resource
-import kotlinx.serialization.Serializable
 
-@Serializable
-@Resource("/home")
+@DeepLink("/home")
 class HomeLink : DeepLinkTarget
 
-@Serializable
-@Resource("/payments/{id}")
+@DeepLink("/payments/{id}")
 class PaymentLink(val id: String) : DeepLinkTarget
 ```
 
-That is the whole KSP contract: **a class annotated `@Resource` that implements `DeepLinkTarget`,
+No `@Serializable` on either: `@DeepLink` is `@MetaSerializable`, so the kotlinx.serialization
+compiler plugin generates the serialiser from it alone.
+
+That is the whole KSP contract: **a class annotated `@DeepLink` that implements `DeepLinkTarget`,
 in the sources of a module applying `dev.carcara.perch`, becomes a registered route.** Nothing
-else registers it, and nothing outside that module's own sources is scanned.
+else registers it, and nothing outside that module's own sources is scanned. If your app also uses
+Ktor's type-safe client, its `@Resource` classes are HTTP resources and not deep links; Perch reads
+`@DeepLink` only, so the two never collide.
 
 ### 2. Aggregate them
 

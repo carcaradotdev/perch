@@ -1,7 +1,5 @@
 package dev.carcara.perch
 
-import io.ktor.resources.Resource
-import kotlinx.serialization.Serializable
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -288,18 +286,14 @@ class DeepLinkParserSchemeHostTest {
       .apply { register<SearchLink>() }
 }
 
-@Serializable
-@Resource("/payments/{id}")
+@DeepLink("/payments/{id}")
 private class PaymentLink(val id: String) : DeepLinkTarget
 
-@Serializable
-@Resource("/pay.co/{id}")
+@DeepLink("/pay.co/{id}")
 private class DottedLink(val id: String) : DeepLinkTarget
 
-@Serializable
-@Resource("/search")
+@DeepLink("/search")
 private class SearchLink(val query: String) : DeepLinkTarget
 
-@Serializable
-@Resource("/{tenant}/payments/{id}")
+@DeepLink("/{tenant}/payments/{id}")
 private class TenantLink(val tenant: String, val id: String) : DeepLinkTarget

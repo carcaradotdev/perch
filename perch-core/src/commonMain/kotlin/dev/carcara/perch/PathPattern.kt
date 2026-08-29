@@ -1,7 +1,8 @@
 package dev.carcara.perch
 
-import io.ktor.http.Parameters
-import io.ktor.resources.serialization.ResourcesFormat
+import dev.carcara.perch.serialization.DeepLinkFormat
+import dev.carcara.perch.serialization.DeepLinkParameters
+import dev.carcara.perch.serialization.percentDecode
 import kotlinx.serialization.KSerializer
 
 /**
@@ -104,7 +105,7 @@ internal sealed class PathSegment {
     override fun evaluate(segments: List<String>, index: Int): EvaluationResult? {
       if (index >= segments.size) return null
       if (segments[index] != value) return null
-      return EvaluationResult(Parameters.Empty, segmentIncrement = 1)
+      return EvaluationResult(DeepLinkParameters.Empty, segmentIncrement = 1)
     }
   }
 
@@ -113,7 +114,7 @@ internal sealed class PathSegment {
       if (index >= segments.size) return null
       val value = segments[index]
       return EvaluationResult(
-        parameters = Parameters.build { append(name, value) },
+        parameters = DeepLinkParameters.build { append(name, value) },
         segmentIncrement = 1,
       )
     }
@@ -122,11 +123,11 @@ internal sealed class PathSegment {
   data class OptionalParameter(val name: String) : PathSegment() {
     override fun evaluate(segments: List<String>, index: Int): EvaluationResult {
       if (index >= segments.size) {
-        return EvaluationResult(Parameters.Empty, segmentIncrement = 0)
+        return EvaluationResult(DeepLinkParameters.Empty, segmentIncrement = 0)
       }
       val value = segments[index]
       return EvaluationResult(
-        parameters = Parameters.build { append(name, value) },
+        parameters = DeepLinkParameters.build { append(name, value) },
         segmentIncrement = 1,
       )
     }
@@ -136,18 +137,18 @@ internal sealed class PathSegment {
     override fun evaluate(segments: List<String>, index: Int): EvaluationResult {
       val remaining = segments.drop(index)
       val params = if (name.isNotEmpty() && remaining.isNotEmpty()) {
-        Parameters.build {
+        DeepLinkParameters.build {
           remaining.forEach { append(name, it) }
         }
       } else {
-        Parameters.Empty
+        DeepLinkParameters.Empty
       }
       return EvaluationResult(params, segmentIncrement = remaining.size)
     }
   }
 
   data class EvaluationResult(
-    val parameters: Parameters,
+    val parameters: DeepLinkParameters,
     val segmentIncrement: Int,
   )
 
@@ -174,7 +175,7 @@ internal sealed class PathSegment {
 internal class RegisteredRoute<T : DeepLinkTarget>(
   private val serializer: KSerializer<T>,
   pathPattern: String,
-  private val format: ResourcesFormat,
+  private val format: DeepLinkFormat,
 ) {
   private val segments: List<PathSegment> = pathPattern
     .split("/")
@@ -183,10 +184,10 @@ internal class RegisteredRoute<T : DeepLinkTarget>(
 
   private val hasTailcard: Boolean = segments.any { it is PathSegment.Tailcard }
 
-  fun tryParse(urlSegments: List<String>, queryParams: Parameters): T? {
+  fun tryParse(urlSegments: List<String>, queryParams: DeepLinkParameters): T? {
     val pathParams = matchPattern(urlSegments) ?: return null
 
-    val allParams = Parameters.build {
+    val allParams = DeepLinkParameters.build {
       appendAll(pathParams)
       appendAll(queryParams)
     }
@@ -194,9 +195,9 @@ internal class RegisteredRoute<T : DeepLinkTarget>(
     return runCatching { format.decodeFromParameters(serializer, allParams) }.getOrNull()
   }
 
-  private fun matchPattern(urlSegments: List<String>): Parameters? {
+  private fun matchPattern(urlSegments: List<String>): DeepLinkParameters? {
     var urlIndex = 0
-    val collectedParams = Parameters.build {
+    val collectedParams = DeepLinkParameters.build {
       for (segment in segments) {
         val result = segment.evaluate(urlSegments, urlIndex) ?: return null
         appendAll(result.parameters)
@@ -230,7 +231,7 @@ internal class UrlLocation private constructor(
   val scheme: String?,
   val host: String?,
   val pathSegments: List<String>,
-  val queryParameters: Parameters,
+  val queryParameters: DeepLinkParameters,
 ) {
   companion object {
     private const val SCHEME_SEPARATOR = "://"
@@ -283,17 +284,20 @@ internal class UrlLocation private constructor(
       val (beforeQuery, queryString) = beforeFragment.split("?", limit = 2)
         .let { it[0] to it.getOrNull(1) }
 
-      val pathSegments = beforeQuery.split("/").filter { it.isNotEmpty() }
-      val queryParameters = queryString?.let(::parametersOf) ?: Parameters.Empty
+      // Decoding happens per segment, after the split, so a `%2F` inside a parameter's value
+      // becomes a slash in that value rather than a new segment boundary. The authority is never
+      // decoded: the host check has to judge the same bytes a browser resolves.
+      val pathSegments = beforeQuery.split("/").filter { it.isNotEmpty() }.map(::percentDecode)
+      val queryParameters = queryString?.let(::parametersOf) ?: DeepLinkParameters.Empty
 
       return UrlLocation(scheme, host, pathSegments, queryParameters)
     }
 
     /** The `a=1&b=2` pairs of a query string. A fragment of a pair with no `=` is discarded. */
-    private fun parametersOf(query: String): Parameters = Parameters.build {
+    private fun parametersOf(query: String): DeepLinkParameters = DeepLinkParameters.build {
       query.split("&").forEach { param ->
         val pair = param.split("=", limit = 2)
-        if (pair.size == 2) append(pair[0], pair[1])
+        if (pair.size == 2) append(percentDecode(pair[0]), percentDecode(pair[1]))
       }
     }
 
