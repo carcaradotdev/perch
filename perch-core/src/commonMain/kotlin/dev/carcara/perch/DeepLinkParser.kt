@@ -1,14 +1,15 @@
 package dev.carcara.perch
 
-import io.ktor.resources.href
-import io.ktor.resources.serialization.ResourcesFormat
+import dev.carcara.perch.serialization.DeepLinkFormat
+import dev.carcara.perch.serialization.encodeToPath
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.serializer
 
 /**
  * Parses deep-link URLs into type-safe [DeepLinkTarget] objects.
  *
- * Pattern matching follows Ktor's routing conventions:
+ * A route is a class annotated [DeepLink], whose path pattern decides which of its properties come
+ * out of the path:
  * - `{param}` required path parameter
  * - `{param?}` optional path parameter
  * - `{param...}` tailcard, matching the remaining segments
@@ -34,7 +35,9 @@ import kotlinx.serialization.serializer
  * schemes are unaffected: for them [hosts] is meaningless and may stay empty.
  *
  * A fragment is discarded, in every scheme, before the path and query are read. Surrounding
- * whitespace is trimmed. Nothing is percent-decoded, and the path is not normalised: `.` and `..`
+ * whitespace is trimmed. Path segments and query components are percent-decoded one at a time,
+ * after the URL has been split, so `%2F` lands inside a parameter's value instead of opening a new
+ * segment; this is the inverse of what [toUrl] encodes. The path is not normalised: `.` and `..`
  * are ordinary segments here, so a `{param...}` tailcard route receives them verbatim rather than
  * having them resolved away.
  *
@@ -75,14 +78,11 @@ public class DeepLinkParser(
 
   /**
    * What [toUrl] puts in front of the encoded path: `"<scheme>:/"` for a custom scheme, or
-   * `"https://<host>"` when every configured scheme is hierarchical. `@PublishedApi internal`
-   * rather than private: [toUrl] is inline with a reified type, so it cannot read a private member.
+   * `"https://<host>"` when every configured scheme is hierarchical.
    */
-  @PublishedApi
-  internal val urlPrefix: String = buildUrlPrefix(this.schemes, this.hosts)
+  private val urlPrefix: String = buildUrlPrefix(this.schemes, this.hosts)
 
-  @PublishedApi
-  internal val format: ResourcesFormat = ResourcesFormat()
+  private val format = DeepLinkFormat()
 
   private val registeredRoutes = mutableListOf<RegisteredRoute<*>>()
   private val registeredPatterns = mutableMapOf<String, String>()
@@ -93,13 +93,13 @@ public class DeepLinkParser(
 
   public fun <T : DeepLinkTarget> register(serializer: KSerializer<T>) {
     val routeName = serializer.descriptor.serialName
-    // A route with no @Resource path pattern cannot be a deep link. This happens when a stale
-    // generated registration still names a route whose @Resource was removed. Skip it rather
+    // A route with no @DeepLink path pattern cannot be a deep link. This happens when a stale
+    // generated registration still names a route whose @DeepLink was removed. Skip it rather
     // than let one bad entry crash app startup; the deep link just will not resolve.
     val pathPattern = try {
       format.encodeToPathPattern(serializer)
     } catch (error: Exception) {
-      logger.error("Skipping deep link route '$routeName' with no @Resource path pattern", error)
+      logger.error("Skipping deep link route '$routeName' with no @DeepLink path pattern", error)
       return
     }
     val normalizedPattern = pathPattern.trimEnd('/')
@@ -139,11 +139,19 @@ public class DeepLinkParser(
    * `://`; a hierarchical one puts a host there. When every configured scheme is hierarchical the
    * URL is emitted as `https://<first host>/...` instead, against the first entry of `hosts`.
    * Either way the result parses back through [parse].
+   *
+   * Path segments and query components are percent-encoded, so a value carrying a slash, a space
+   * or a non-ASCII character survives the round trip.
+   *
+   * @throws DeepLinkSerializationException when [deepLink] is not a `@DeepLink` route, or a
+   * required placeholder in its path has no value to fill it.
    */
-  public inline fun <reified T : DeepLinkTarget> toUrl(deepLink: T): String {
-    val path = href(format, deepLink)
-    return "$urlPrefix$path"
-  }
+  public inline fun <reified T : DeepLinkTarget> toUrl(deepLink: T): String =
+    toUrl(serializer<T>(), deepLink)
+
+  /** [toUrl] for a serialiser resolved by the caller, rather than reified at the call site. */
+  public fun <T : DeepLinkTarget> toUrl(serializer: KSerializer<T>, deepLink: T): String =
+    "$urlPrefix${format.encodeToPath(serializer, deepLink)}"
 }
 
 /**

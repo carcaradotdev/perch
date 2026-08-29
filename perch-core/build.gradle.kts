@@ -24,12 +24,11 @@ kotlin {
 
   sourceSets {
     commonMain.dependencies {
-      // Both `api` because both are on a public signature here: ktor-resources' ResourcesFormat
-      // and kotlinx-serialization's KSerializer on `register`.
+      // The only dependency, and `api` because KSerializer is on `register` and `toUrl`, and
+      // because a consumer's route classes are annotated `@DeepLink`, which is `@MetaSerializable`.
       //
       // kotlinx-serialization-core rather than -json: nothing here reads or writes JSON, and the
       // json artifact sat on every consumer's runtime and native compile classpath for nothing.
-      api(libs.ktor.resources)
       api(libs.kotlinx.serialization.core)
     }
     commonTest.dependencies {

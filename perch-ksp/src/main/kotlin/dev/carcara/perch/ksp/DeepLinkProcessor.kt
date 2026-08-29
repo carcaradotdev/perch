@@ -14,7 +14,7 @@ import java.io.OutputStreamWriter
  * KSP processor that generates a `registerDeepLinks()` extension on the module's parser.
  *
  * The rule is one sentence: a class in this module's own sources, annotated
- * `@io.ktor.resources.Resource`, that implements the configured target base class, is a route.
+ * `@dev.carcara.perch.DeepLink`, that implements the configured target base class, is a route.
  * The processor never looks outside the module it runs on.
  */
 internal class DeepLinkProcessor(
@@ -24,7 +24,7 @@ internal class DeepLinkProcessor(
 ) : SymbolProcessor {
 
   private companion object {
-    private const val RESOURCE_ANNOTATION = "io.ktor.resources.Resource"
+    private const val DEEP_LINK_ANNOTATION = "dev.carcara.perch.DeepLink"
     private const val DEFAULT_TARGET_BASE_CLASS = "dev.carcara.perch.DeepLinkTarget"
     private const val DEFAULT_PARSER_CLASS = "dev.carcara.perch.DeepLinkParser"
   }
@@ -44,7 +44,7 @@ internal class DeepLinkProcessor(
     val routeClasses = mutableSetOf<KSClassDeclaration>()
     resolver.getAllFiles().forEach { file ->
       file.declarations.filterIsInstance<KSClassDeclaration>().forEach { classDecl ->
-        collectRoutesWithResource(classDecl, routeClasses)
+        collectRoutes(classDecl, routeClasses)
       }
     }
 
@@ -55,23 +55,23 @@ internal class DeepLinkProcessor(
     return emptyList()
   }
 
-  private fun collectRoutesWithResource(
+  private fun collectRoutes(
     classDecl: KSClassDeclaration,
     result: MutableSet<KSClassDeclaration>,
   ) {
-    if (hasResourceAnnotation(classDecl) && extendsRoute(classDecl)) {
+    if (hasDeepLinkAnnotation(classDecl) && extendsRoute(classDecl)) {
       result.add(classDecl)
     }
 
     classDecl.declarations
       .filterIsInstance<KSClassDeclaration>()
       .forEach { nested ->
-        collectRoutesWithResource(nested, result)
+        collectRoutes(nested, result)
       }
   }
 
-  private fun hasResourceAnnotation(classDecl: KSClassDeclaration): Boolean = classDecl.annotations.any { annotation ->
-    annotation.annotationType.resolve().declaration.qualifiedName?.asString() == RESOURCE_ANNOTATION
+  private fun hasDeepLinkAnnotation(classDecl: KSClassDeclaration): Boolean = classDecl.annotations.any { annotation ->
+    annotation.annotationType.resolve().declaration.qualifiedName?.asString() == DEEP_LINK_ANNOTATION
   }
 
   private fun extendsRoute(classDecl: KSClassDeclaration): Boolean = classDecl.superTypes.any { superType ->
@@ -96,7 +96,7 @@ internal class DeepLinkProcessor(
     val registeredRoutes = mutableListOf<Pair<String, String>>()
 
     routeClasses.forEach { classDecl ->
-      val path = getResourcePath(classDecl) ?: return@forEach
+      val path = deepLinkPath(classDecl) ?: return@forEach
       val routeName = classDecl.qualifiedName?.asString() ?: return@forEach
 
       for ((existingPath, existingRoute) in registeredRoutes) {
@@ -141,7 +141,7 @@ internal class DeepLinkProcessor(
 
       val parserSimpleName = parserClass.substringAfterLast(".")
       writer.write("internal fun $parserSimpleName.registerDeepLinks() {\n")
-      // routeInfoList, not routeClasses: a class whose @Resource path could not be read was
+      // routeInfoList, not routeClasses: a class whose @DeepLink path could not be read was
       // skipped above and has no manifest entry, so registering it here would emit a
       // register<T>() the manifest does not know about.
       routeInfoList.sortedBy { it.routeClassName }.forEach { route ->
@@ -179,13 +179,13 @@ internal class DeepLinkProcessor(
     val moduleName: String,
   )
 
-  private fun getResourcePath(classDecl: KSClassDeclaration): String? {
-    val resourceAnnotation = classDecl.annotations.find { annotation ->
-      annotation.annotationType.resolve().declaration.qualifiedName?.asString() == RESOURCE_ANNOTATION
+  private fun deepLinkPath(classDecl: KSClassDeclaration): String? {
+    val deepLinkAnnotation = classDecl.annotations.find { annotation ->
+      annotation.annotationType.resolve().declaration.qualifiedName?.asString() == DEEP_LINK_ANNOTATION
     } ?: return null
 
-    // The @Resource annotation has a single "path" argument (or value).
-    val pathArg = resourceAnnotation.arguments.firstOrNull()
+    // The @DeepLink annotation has a single "path" argument.
+    val pathArg = deepLinkAnnotation.arguments.firstOrNull()
     return pathArg?.value as? String
   }
 }
