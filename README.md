@@ -280,5 +280,5 @@ introduced a lint violation. Test sources are not linted. It also builds and tes
 which exercises the whole KSP and aggregation pipeline end to end; if a change to either plugin
 breaks the pipeline, the sample is what notices.
 
-CI (`.github/workflows/ci.yml`) runs all three commands above on every pull request, on `macos-15`
-— the Apple targets do not build on other runner images.
+Nothing runs them for you: there is no CI yet. Run all three before opening a pull request, on
+macOS — the Apple targets do not build on other platforms.
