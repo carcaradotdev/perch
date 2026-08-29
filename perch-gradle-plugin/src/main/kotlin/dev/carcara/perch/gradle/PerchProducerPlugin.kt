@@ -31,7 +31,6 @@ public abstract class PerchExtension {
    * consumer only sets this to point at a processor somewhere else.
    */
   public abstract val processorCoordinates: Property<String>
-
 }
 
 /**

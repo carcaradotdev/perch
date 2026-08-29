@@ -7,6 +7,7 @@
 package dev.carcara.perch.serialization
 
 import dev.carcara.perch.DeepLinkSerializationException
+import dev.carcara.perch.PathSegment
 import kotlinx.serialization.KSerializer
 
 /**
@@ -25,8 +26,7 @@ internal fun <T> DeepLinkFormat.encodeToPath(serializer: KSerializer<T>, value: 
 
   val usedForPath = mutableSetOf<String>()
   val segments = pattern.split("/").flatMap { segment ->
-    if (!segment.startsWith('{') || !segment.endsWith('}')) return@flatMap listOf(segment)
-    fillPlaceholder(segment, parameters, usedForPath)
+    fill(PathSegment.parse(segment), parameters, usedForPath)
   }
 
   val query = parameters.filterNames { it !in usedForPath }
@@ -38,41 +38,44 @@ internal fun <T> DeepLinkFormat.encodeToPath(serializer: KSerializer<T>, value: 
   return if (query.isEmpty()) "/$path" else "/$path?$query"
 }
 
-/** The values a `{name}`, `{name?}` or `{name...}` placeholder expands to, marking the name used. */
-private fun fillPlaceholder(
-  segment: String,
+/**
+ * The path elements [segment] expands to, marking any name it consumed as used.
+ *
+ * The segment grammar comes from [PathSegment.parse], the same classification `parse` matches URLs
+ * with. Recognising `{name}`, `{name?}` and `{name...}` a second time here is how the two
+ * directions drift: a placeholder form added to one would go on silently not existing in the other.
+ */
+private fun fill(
+  segment: PathSegment,
   parameters: DeepLinkParameters,
   usedForPath: MutableSet<String>,
-): List<String> {
-  val placeholder = segment.substring(1, segment.lastIndex)
-  return when {
-    placeholder.endsWith('?') -> {
-      val name = placeholder.dropLast(1)
-      val values = parameters.getAll(name) ?: return emptyList()
-      if (values.size > 1) {
-        throw DeepLinkSerializationException(
-          "Expect zero or one parameter with name: $name, but found ${values.size}",
-        )
-      }
-      usedForPath += name
-      values
-    }
+): List<String> = when (segment) {
+  is PathSegment.Constant -> listOf(segment.value)
 
-    placeholder.endsWith("...") -> {
-      val name = placeholder.dropLast(3)
-      usedForPath += name
-      parameters.getAll(name).orEmpty()
+  is PathSegment.OptionalParameter -> {
+    val values = parameters.getAll(segment.name).orEmpty()
+    if (values.size > 1) {
+      throw DeepLinkSerializationException(
+        "Expect zero or one parameter with name: ${segment.name}, but found ${values.size}",
+      )
     }
+    if (values.isNotEmpty()) usedForPath += segment.name
+    values
+  }
 
-    else -> {
-      val values = parameters.getAll(placeholder)
-      if (values == null || values.size != 1) {
-        throw DeepLinkSerializationException(
-          "Expect exactly one parameter with name: $placeholder, but found ${values?.size ?: 0}",
-        )
-      }
-      usedForPath += placeholder
-      values
+  is PathSegment.Tailcard -> {
+    usedForPath += segment.name
+    parameters.getAll(segment.name).orEmpty()
+  }
+
+  is PathSegment.Parameter -> {
+    val values = parameters.getAll(segment.name)
+    if (values == null || values.size != 1) {
+      throw DeepLinkSerializationException(
+        "Expect exactly one parameter with name: ${segment.name}, but found ${values?.size ?: 0}",
+      )
     }
+    usedForPath += segment.name
+    values
   }
 }

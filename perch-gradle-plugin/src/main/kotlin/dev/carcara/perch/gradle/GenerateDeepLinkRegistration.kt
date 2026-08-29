@@ -69,10 +69,10 @@ public abstract class GenerateDeepLinkRegistration : DefaultTask() {
   }
 
   private fun write(packageName: String, routes: List<String>) {
-    // Only the parser is imported. A route is written fully qualified on purpose: importing route
-    // types by simple name collides the moment two modules declare `com.acme.a.Details` and
-    // `com.acme.b.Details`, and an aggregator that spans every module in an app makes that
-    // ordinary rather than rare.
+    // Only the parser and the logger are imported: they are the ones named in the signature. A
+    // route is written fully qualified on purpose: importing route types by simple name collides
+    // the moment two modules declare `com.acme.a.Details` and `com.acme.b.Details`, and an
+    // aggregator that spans every module in an app makes that ordinary rather than rare.
     val registrations = routes.joinToString("\n") { "  register<$it>()" }
     // Not `DeepLinkRegistration.kt`: that is what the KSP processor writes into a producer's own
     // outputPackage, and a module that both declares a route and aggregates - an app module with

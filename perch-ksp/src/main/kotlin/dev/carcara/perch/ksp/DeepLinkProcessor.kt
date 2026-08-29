@@ -29,7 +29,6 @@ internal class DeepLinkProcessor(
     private const val LOGGER_CLASS = "dev.carcara.perch.DeepLinkLogger"
   }
 
-
   private var processed = false
 
   override fun process(resolver: Resolver): List<KSAnnotated> {
