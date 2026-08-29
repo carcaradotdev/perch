@@ -49,14 +49,15 @@ class DeepLinkProcessorTest {
   )
 
   @Test
-  fun `generates a registration extension for every annotated target`() {
+  fun `generates a parser factory carrying every annotated route`() {
     val result = compile(routeSource)
 
     assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode)
     val generated = File(result.outputDirectory.parentFile, "ksp/sources/kotlin/com/acme/home/DeepLinkRegistration.kt")
     val text = generated.readText()
 
-    assertTrue(text.contains("internal fun DeepLinkParser.registerDeepLinks()"))
+    assertTrue(text, text.contains("internal fun perchModuleParser("))
+    assertTrue(text, text.contains("): DeepLinkParser = DeepLinkParser(schemes, hosts, logger).apply {"))
     assertTrue(text.contains("register<com.acme.home.HomeLink>()"))
     assertTrue(text.contains("register<com.acme.home.PaymentLink>()"))
     assertTrue(!text.contains("NotADeepLink"))

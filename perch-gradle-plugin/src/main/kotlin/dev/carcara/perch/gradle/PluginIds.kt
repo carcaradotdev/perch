@@ -9,6 +9,6 @@ internal const val KOTLIN_MULTIPLATFORM_ID: String = "org.jetbrains.kotlin.multi
 
 /**
  * KSP's task on the `commonMain` metadata compilation, which is where Perch's processor runs. Both
- * the manifest artifact and the generated `registerDeepLinks()` come out of it.
+ * the manifest artifact and the generated `perchModuleParser()` come out of it.
  */
 internal const val KSP_METADATA_TASK: String = "kspCommonMainKotlinMetadata"

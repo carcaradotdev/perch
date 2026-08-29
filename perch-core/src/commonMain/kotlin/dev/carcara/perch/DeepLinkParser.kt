@@ -92,6 +92,7 @@ public class DeepLinkParser(
 
   private val registeredRoutes = mutableListOf<RegisteredRoute<*>>()
   private val registeredPatterns = mutableMapOf<String, String>()
+  private var warnedEmpty = false
 
   /** Registers [T] so [parse] can return it. Registering the same route twice is a no-op. */
   public inline fun <reified T : Any> register() {
@@ -128,6 +129,7 @@ public class DeepLinkParser(
   }
 
   public fun parse(url: String): Any? {
+    warnIfEmpty()
     val location = UrlLocation.of(url) ?: return null
     if (location.scheme != null && location.scheme !in schemes) return null
     if (location.host != null && hosts.isNotEmpty() && location.host !in hosts) return null
@@ -137,6 +139,25 @@ public class DeepLinkParser(
       if (result != null) return result
     }
     return null
+  }
+
+  /**
+   * Reports, once, that this parser has no routes.
+   *
+   * A parser nobody registered anything on answers null to every URL, which is indistinguishable
+   * from a URL that matches nothing — the failure a consumer who forgot the generated
+   * `perchParser()` would otherwise chase at runtime. The flag races harmlessly: the worst a
+   * concurrent first call costs is a second copy of the message.
+   */
+  private fun warnIfEmpty() {
+    if (registeredRoutes.isNotEmpty() || warnedEmpty) return
+    warnedEmpty = true
+    logger.error(
+      "DeepLinkParser.parse was called with no routes registered, so it can only return null. " +
+        "Build the parser with the generated perchParser(), or register routes yourself with " +
+        "register<T>().",
+      null,
+    )
   }
 
   /**

@@ -18,7 +18,7 @@ private const val MINIMUM_TARGETS = 2
 
 public abstract class PerchExtension {
   /**
-   * Package the generated `registerDeepLinks()` extension is emitted into. Required.
+   * Package the generated `perchModuleParser()` factory is emitted into. Required.
    * A blank value skips codegen for the module while its manifest directory still publishes.
    */
   public abstract val outputPackage: Property<String>
@@ -32,8 +32,6 @@ public abstract class PerchExtension {
    */
   public abstract val processorCoordinates: Property<String>
 
-  /** Fully qualified name of the parser the generated extension targets. */
-  public abstract val parserClass: Property<String>
 }
 
 /**
@@ -48,7 +46,6 @@ public class PerchProducerPlugin : Plugin<Project> {
   override fun apply(project: Project) {
     val extension = project.extensions.create("perch", PerchExtension::class.java)
     extension.processorCoordinates.convention("dev.carcara.perch:perch-ksp:${PerchVersion.value}")
-    extension.parserClass.convention("dev.carcara.perch.DeepLinkParser")
 
     // The perch-manifest-*.txt files the processor writes land in the shared KSP resources
     // directory, so this publishes that directory and the consumer filters by filename.
@@ -85,7 +82,6 @@ public class PerchProducerPlugin : Plugin<Project> {
           ?: throw GradleException("dev.carcara.perch: set `perch.outputPackage` in $projectPath")
       }
       ksp.arg("perch.outputPackage", outputPackage)
-      ksp.arg("perch.parserClass", extension.parserClass)
     }
 
     project.plugins.withId(KOTLIN_MULTIPLATFORM_ID) { compileGeneratedRegistration(project) }
@@ -109,7 +105,7 @@ public class PerchProducerPlugin : Plugin<Project> {
 
   /**
    * Puts the processor's generated Kotlin on the module's own compile path, so the module can call
-   * the `registerDeepLinks()` it generates.
+   * the `perchModuleParser()` it generates.
    *
    * Without this the module publishes a manifest for an aggregator and nothing else: the generated
    * file is written but no source set holds it and no compile task waits for it, which leaves the
@@ -130,7 +126,7 @@ public class PerchProducerPlugin : Plugin<Project> {
    * classpath, and both are absent unless the module opts into them.
    *
    * Applying `dev.carcara.perch.aggregation` to the same module stays fine: that plugin generates
-   * a differently named `registerAllDeepLinks()` into a directory of its own.
+   * a differently named `perchParser()` into a directory of its own.
    */
   private fun compileGeneratedRegistration(project: Project) {
     val generatedSources =

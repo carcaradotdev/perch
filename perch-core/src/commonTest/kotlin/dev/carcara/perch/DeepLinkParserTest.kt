@@ -205,6 +205,35 @@ class DeepLinkParserTest {
   }
 
   @Test
+  fun `parsing against an empty parser reports it once`() {
+    val recorded = mutableListOf<String>()
+    val subject = DeepLinkParser(
+      schemes = setOf("acme"),
+      logger = DeepLinkLogger { message, _ -> recorded += message },
+    )
+
+    subject.parse("acme://payments/abc123")
+    subject.parse("acme://home")
+
+    assertEquals(1, recorded.size)
+    assertTrue(recorded.single().contains("no routes registered"))
+  }
+
+  @Test
+  fun `a parser with routes reports nothing`() {
+    val recorded = mutableListOf<String>()
+    val subject = DeepLinkParser(
+      schemes = setOf("acme"),
+      logger = DeepLinkLogger { message, _ -> recorded += message },
+    )
+    subject.register<PaymentDeepLink>()
+
+    subject.parse("acme://nothing/matches/this")
+
+    assertTrue(recorded.isEmpty(), recorded.toString())
+  }
+
+  @Test
   fun `narrowing the result keeps a when over a sealed route type exhaustive`() {
     // Perch imposes no supertype, so `parse` hands back Any?. An app that groups its routes under
     // a sealed type of its own narrows once and keeps the exhaustive `when`, with no `else`. This
