@@ -25,11 +25,9 @@ import com.example.sample.routes.PaymentLink
 @Composable
 fun Nav3Demo(route: Any?) {
   val backStack = remember(route) {
-    val deepLinked = route as? NavKey
-    if (deepLinked == null || deepLinked is HomeLink) {
-      NavBackStack<NavKey>(HomeLink())
-    } else {
-      NavBackStack<NavKey>(HomeLink(), deepLinked)
+    when (val deepLinked = route as? NavKey) {
+      null, is HomeLink -> NavBackStack<NavKey>(HomeLink())
+      else -> NavBackStack<NavKey>(HomeLink(), deepLinked)
     }
   }
 

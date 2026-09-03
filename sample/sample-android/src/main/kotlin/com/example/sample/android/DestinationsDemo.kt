@@ -35,10 +35,8 @@ import com.ramcosta.composedestinations.utils.rememberDestinationsNavigator
  * the object through rather than copying fields out of it, and adding a parameter to the route is
  * one edit instead of three.
  *
- * Compose Destinations has a deep-link feature of its own, declared per destination and resolved
- * by androidx.navigation. Perch is doing the resolving instead: it decides what URLs mean while
- * they are still URLs, and hands over a `Direction` once the answer is a typed object. The two do
- * not overlap, and this demo never sets `deepLinks` on a `@Destination`.
+ * Compose Destinations has a deep-link feature of its own, and this demo deliberately never sets
+ * `deepLinks` on a `@Destination` - see the README for why the two do not overlap.
  */
 @Composable
 fun DestinationsDemo(route: Any?) {

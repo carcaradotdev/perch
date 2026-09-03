@@ -43,9 +43,9 @@ fun ScreenHeader(title: String, onBack: () -> Unit) {
 
 /** A labelled one-line rendering of a route, used by the picker and by all three demos. */
 @Composable
-fun RouteReadout(label: String, route: Any?, modifier: Modifier = Modifier) {
+fun RouteReadout(label: String, route: Any?) {
   Surface(
-    modifier = modifier.fillMaxWidth(),
+    modifier = Modifier.fillMaxWidth(),
     color = MaterialTheme.colorScheme.surfaceVariant,
     shape = MaterialTheme.shapes.medium,
   ) {

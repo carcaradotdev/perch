@@ -2,13 +2,9 @@
 agp = "9.2.1"
 android-compileSdk = "36"
 android-minSdk = "21"
-# The sample app draws Compose UI and pulls three navigation libraries, whose floors sit above the
-# library's at both ends: Compose asks to be compiled against 37, and the navigation libraries do
-# not ship for API 21. Perch itself still builds against 36 and installs on 21 - these two are the
-# sample's numbers, not Perch's.
-android-sampleCompileSdk = "36"
-android-sampleTargetSdk = "36"
-android-sampleMinSdk = "24"
+# The sample app's own floor, above the library's: navigation3-runtime declares minSdk 23, and the
+# manifest merger refuses to build the app below it. Perch itself still installs on 21.
+android-sampleMinSdk = "23"
 androidxActivity = "1.13.0"
 binaryCompatibilityValidator = "0.18.1"
 composeBom = "2026.06.01"

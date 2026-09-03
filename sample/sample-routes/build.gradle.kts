@@ -21,7 +21,7 @@ kotlin {
   // there is nothing for an Android consumer to resolve against.
   androidLibrary {
     namespace = "com.example.sample.routes"
-    compileSdk = libs.versions.android.sampleCompileSdk.get().toInt()
+    compileSdk = libs.versions.android.compileSdk.get().toInt()
     minSdk = libs.versions.android.sampleMinSdk.get().toInt()
   }
 

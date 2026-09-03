@@ -73,8 +73,10 @@ regardless of the targets of the module they process, so it does not need to be.
 
 ## Quick start
 
-This walks through the same thing `sample/` in this repository builds and tests end to end; the
-snippets below are taken from it.
+This walks through the same thing `sample/` in this repository builds and tests end to end. The
+snippets follow it, with one difference: the sample's routes also implement Navigation 3's `NavKey`,
+which its app screen needs and Perch does not care about either way. See
+[Handing the route to a navigator](#handing-the-route-to-a-navigator).
 
 ### 1. Declare a route
 
