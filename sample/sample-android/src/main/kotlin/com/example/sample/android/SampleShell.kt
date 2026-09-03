@@ -31,7 +31,13 @@ private const val DEFAULT_URL = "sample://payments/abc123"
  */
 class IncomingUrl(val url: String)
 
-/** The three demos, in the order the picker lists them. */
+/**
+ * The demos, in the order the picker lists them.
+ *
+ * Both navigators here are Kotlin Multiplatform. That is the bar for being in this sample: Perch
+ * parses one URL into one route object for every target, so a navigator that only ships an Android
+ * artifact has nothing to say about that.
+ */
 private enum class Demo(val title: String, val summary: String) {
   Nav3(
     title = "Navigation 3",
@@ -40,10 +46,6 @@ private enum class Demo(val title: String, val summary: String) {
   Voyager(
     title = "Voyager",
     summary = "A Screen is UI, so the route maps to one here, where the UI already lives.",
-  ),
-  Destinations(
-    title = "Compose Destinations",
-    summary = "Its generated destination takes the route class itself as its arguments.",
   ),
 }
 
@@ -127,7 +129,6 @@ private fun OpenDemo(demo: Demo, route: Any?, onBack: () -> Unit) {
     when (demo) {
       Demo.Nav3 -> Nav3Demo(route)
       Demo.Voyager -> VoyagerDemo(route)
-      Demo.Destinations -> DestinationsDemo(route)
     }
   }
 }

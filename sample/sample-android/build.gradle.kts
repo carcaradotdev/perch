@@ -3,10 +3,6 @@ plugins {
   // that plugin on top of it is an error rather than a redundancy.
   alias(libs.plugins.androidApplication)
   alias(libs.plugins.composeCompiler)
-  // Compose Destinations generates its `NavGraphs` and `Direction`s from the `@Destination`
-  // composables in this module. Perch's own processor does not run here - this module declares no
-  // routes, it only consumes the ones sample-routes declares.
-  alias(libs.plugins.ksp)
   id("dev.carcara.perch.detekt")
 }
 
@@ -36,10 +32,10 @@ dependencies {
   implementation(libs.androidx.activity.compose)
 
   // One per demo screen. Nothing here is a Perch dependency: Perch hands back a route object and
-  // has no opinion about which of these consumes it.
+  // has no opinion about which of these consumes it. Both are Kotlin Multiplatform libraries,
+  // which is the bar for appearing in this sample at all - a navigator that only ships an Android
+  // artifact cannot demonstrate anything about a multiplatform route.
   implementation(libs.navigation3.runtime)
   implementation(libs.navigation3.ui)
   implementation(libs.voyager.navigator)
-  implementation(libs.composeDestinations.core)
-  ksp(libs.composeDestinations.ksp)
 }

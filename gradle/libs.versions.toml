@@ -8,7 +8,6 @@ android-sampleMinSdk = "23"
 androidxActivity = "1.13.0"
 binaryCompatibilityValidator = "0.18.1"
 composeBom = "2026.06.01"
-composeDestinations = "2.3.0"
 detekt = "1.23.8"
 junit = "4.13.2"
 kctfork = "0.13.0"
@@ -43,8 +42,6 @@ compose-ui = { module = "androidx.compose.ui:ui" }
 navigation3-runtime = { module = "androidx.navigation3:navigation3-runtime", version.ref = "navigation3" }
 navigation3-ui = { module = "androidx.navigation3:navigation3-ui", version.ref = "navigation3" }
 voyager-navigator = { module = "cafe.adriel.voyager:voyager-navigator", version.ref = "voyager" }
-composeDestinations-core = { module = "io.github.raamcosta.compose-destinations:core", version.ref = "composeDestinations" }
-composeDestinations-ksp = { module = "io.github.raamcosta.compose-destinations:ksp", version.ref = "composeDestinations" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

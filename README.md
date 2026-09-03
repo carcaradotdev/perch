@@ -239,7 +239,7 @@ navigation library you already use.
 
 ## Handing the route to a navigator
 
-`sample/sample-android` is an installable app that takes one parsed route and gives it to three
+`sample/sample-android` is an installable app that takes one parsed route and gives it to two
 navigation libraries in turn, one screen each:
 
 ```bash
@@ -247,7 +247,11 @@ navigation libraries in turn, one screen each:
 adb shell am start -a android.intent.action.VIEW -d "sample://payments/abc123"
 ```
 
-The URL is also editable in the app, so the three demos are reachable without `adb`.
+The URL is also editable in the app, so both demos are reachable without `adb`.
+
+Both are Kotlin Multiplatform libraries, which is the bar for being in this sample at all: Perch
+turns one URL into one route object for every target, so a navigator that only ships an Android
+artifact has nothing to say about that.
 
 **Navigation 3** needs no adapter. Its back stack holds `NavKey`, a marker interface, and because
 Perch demands no supertype the route classes are free to implement it — so `parse` returns an
@@ -265,25 +269,8 @@ if (route is NavKey) backStack.add(route)
 `@DeepLink` has already arranged: it is `@MetaSerializable`, so the compiler generates the
 serializer without a second annotation.
 
-**Compose Destinations** takes the route class as a destination's arguments. Point `navArgs` at it
-and the generated destination is typed by it — `invoke` takes one, `argsFrom` rebuilds one off the
-back stack, and the composable receives one — so the route object goes across whole:
-
-```kotlin
-@Destination<RootGraph>(navArgs = PaymentLink::class)
-@Composable
-fun PaymentScreen(link: PaymentLink) { … }
-
-fun Any?.toDirection(): Direction? = when (this) {
-    is HomeLink -> HomeScreenDestination
-    is PaymentLink -> PaymentScreenDestination(this)
-    else -> null
-}
-```
-
-**Voyager** is the one that genuinely needs a second type. A `Screen` declares
-`@Composable fun Content()` — it *is* the UI, so a shared route module implementing it would have
-to depend on Compose and carry the layout:
+**Voyager** needs a second type. A `Screen` declares `@Composable fun Content()` — it *is* the UI,
+so a shared route module implementing it would have to depend on Compose and carry the layout:
 
 ```kotlin
 fun Any?.toScreen(): Screen? = when (this) {
@@ -293,9 +280,9 @@ fun Any?.toScreen(): Screen? = when (this) {
 }
 ```
 
-Compose Destinations has a deep-link feature of its own, declared per destination and resolved by
-androidx.navigation. The two do not overlap: Perch decides what a URL means while it is still a
-URL, and hands over a typed object; what happens to that object is the navigator's business.
+Some navigators bring a deep-link feature of their own. It does not overlap with this one: Perch
+decides what a URL means while it is still a URL, and hands over a typed object; what happens to
+that object is the navigator's business.
 
 ## The codegen pipeline
 

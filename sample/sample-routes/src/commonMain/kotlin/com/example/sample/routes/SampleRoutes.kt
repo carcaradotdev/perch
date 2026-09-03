@@ -13,9 +13,9 @@ import dev.carcara.perch.DeepLink
 // which `@DeepLink` has already arranged.
 //
 // The same trick does not work for every navigator, and that is the point of the sample app's
-// other two screens: Voyager's `Screen` and Compose Destinations' `Direction` are UI types, so a
-// route module implementing them would have to depend on Compose. Those two map instead, in the
-// app module where the UI already lives.
+// other screen: Voyager's `Screen` declares `@Composable fun Content()`, so it is UI, and a route
+// module implementing it would have to depend on Compose and carry the layout. That one maps
+// instead, in the app module where the UI already lives.
 
 /** A route with no path parameters. */
 @DeepLink("/home")
