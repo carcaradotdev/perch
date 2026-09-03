@@ -43,7 +43,7 @@ private enum class Demo(val title: String, val summary: String) {
   ),
   Destinations(
     title = "Compose Destinations",
-    summary = "Its destinations are generated, so the route maps to a generated Direction.",
+    summary = "Its generated destination takes the route class itself as its arguments.",
   ),
 }
 

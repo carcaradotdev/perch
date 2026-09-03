@@ -263,21 +263,30 @@ if (route is NavKey) backStack.add(route)
 `@DeepLink` has already arranged: it is `@MetaSerializable`, so the compiler generates the
 serializer without a second annotation.
 
-**Voyager** and **Compose Destinations** need one `when`. A Voyager `Screen` declares
-`@Composable fun Content()`, and a Compose Destinations `Direction` is generated from a
-`@Destination` composable — both are UI, so implementing them in a shared route module would drag
-Compose in with them. The mapping goes in the UI module instead:
+**Compose Destinations** takes the route class as a destination's arguments. Point `navArgs` at it
+and the generated destination is typed by it — `invoke` takes one, `argsFrom` rebuilds one off the
+back stack, and the composable receives one — so the route object goes across whole:
 
 ```kotlin
-fun Any?.toScreen(): Screen? = when (this) {          // Voyager
-    is HomeLink -> HomeScreen
-    is PaymentLink -> PaymentScreen(id)
+@Destination<RootGraph>(navArgs = PaymentLink::class)
+@Composable
+fun PaymentScreen(link: PaymentLink) { … }
+
+fun Any?.toDirection(): Direction? = when (this) {
+    is HomeLink -> HomeScreenDestination
+    is PaymentLink -> PaymentScreenDestination(this)
     else -> null
 }
+```
 
-fun Any?.toDirection(): Direction? = when (this) {    // Compose Destinations
-    is HomeLink -> HomeScreenDestination
-    is PaymentLink -> PaymentScreenDestination(id = id)
+**Voyager** is the one that genuinely needs a second type. A `Screen` declares
+`@Composable fun Content()` — it *is* the UI, so a shared route module implementing it would have
+to depend on Compose and carry the layout:
+
+```kotlin
+fun Any?.toScreen(): Screen? = when (this) {
+    is HomeLink -> HomeScreen
+    is PaymentLink -> PaymentScreen(id)
     else -> null
 }
 ```
