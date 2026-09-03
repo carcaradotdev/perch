@@ -36,11 +36,13 @@ rootProject.name = "perch"
 include(":perch-core")
 include(":perch-ksp")
 
-// The sample is not published; it exists to run the whole KSP-and-aggregation pipeline. Naming
-// these two paths also creates the intermediate project `:sample`, which has no build file and no
-// source of its own.
+// The sample is not published. `sample-routes` and `sample-app` run the whole KSP-and-aggregation
+// pipeline; `sample-android` is an installable app that takes the route objects that pipeline
+// produces and hands them to three different navigation libraries. Naming these paths also creates
+// the intermediate project `:sample`, which has no build file and no source of its own.
 include(":sample:sample-routes")
 include(":sample:sample-app")
+include(":sample:sample-android")
 
 // Isolated Projects forbids `subprojects { }` (it is cross-project access from root-project
 // scope). `beforeProject` registered here runs once per project in an isolated context private

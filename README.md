@@ -235,6 +235,57 @@ That is the whole surface: a route object, or `null`. Deciding when to act on it
 and whether the user is allowed to land there is your app's own logic, sitting on top of whatever
 navigation library you already use.
 
+## Handing the route to a navigator
+
+`sample/sample-android` is an installable app that takes one parsed route and gives it to three
+navigation libraries in turn, one screen each:
+
+```bash
+./gradlew :sample:sample-android:installDebug
+adb shell am start -a android.intent.action.VIEW -d "sample://payments/abc123"
+```
+
+The URL is also editable in the app, so the three demos are reachable without `adb`.
+
+**Navigation 3** needs no adapter. Its back stack holds `NavKey`, a marker interface, and because
+Perch demands no supertype the route classes are free to implement it — so `parse` returns an
+object the back stack already accepts:
+
+```kotlin
+@DeepLink("/payments/{id}")
+class PaymentLink(val id: String) : NavKey
+
+val route = parser.parse(url)
+if (route is NavKey) backStack.add(route)
+```
+
+`NavKey` asks that keys be serializable so `rememberNavBackStack` can restore them, which
+`@DeepLink` has already arranged: it is `@MetaSerializable`, so the compiler generates the
+serializer without a second annotation.
+
+**Voyager** and **Compose Destinations** need one `when`. A Voyager `Screen` declares
+`@Composable fun Content()`, and a Compose Destinations `Direction` is generated from a
+`@Destination` composable — both are UI, so implementing them in a shared route module would drag
+Compose in with them. The mapping goes in the UI module instead:
+
+```kotlin
+fun Any?.toScreen(): Screen? = when (this) {          // Voyager
+    is HomeLink -> HomeScreen
+    is PaymentLink -> PaymentScreen(id)
+    else -> null
+}
+
+fun Any?.toDirection(): Direction? = when (this) {    // Compose Destinations
+    is HomeLink -> HomeScreenDestination
+    is PaymentLink -> PaymentScreenDestination(id = id)
+    else -> null
+}
+```
+
+Compose Destinations has a deep-link feature of its own, declared per destination and resolved by
+androidx.navigation. The two do not overlap: Perch decides what a URL means while it is still a
+URL, and hands over a typed object; what happens to that object is the navigator's business.
+
 ## The codegen pipeline
 
 Two Gradle plugins, applied to different modules:
