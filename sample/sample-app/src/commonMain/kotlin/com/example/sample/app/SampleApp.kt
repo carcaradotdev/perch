@@ -3,9 +3,9 @@ package com.example.sample.app
 import dev.carcara.perch.DeepLinkParser
 
 /**
- * Parser wired the way a consuming app wires one: construct, then register the generated set.
+ * Parser wired the way a consuming app wires one: one call, with the routes already in it.
  *
- * `registerAllDeepLinks()` comes from `PerchDeepLinkRegistration.kt`, which the
+ * `perchParser()` comes from `PerchDeepLinkRegistration.kt`, which the
  * `generateDeepLinkRegistration` task writes into `commonMain`. This file does not compile until
  * the whole pipeline - KSP scan, manifest publication, aggregation - has run, which is the point.
  *
@@ -13,5 +13,4 @@ import dev.carcara.perch.DeepLinkParser
  * `https` without hosts, since an empty host set would let any website deep-link into these routes.
  */
 public fun sampleParser(): DeepLinkParser =
-  DeepLinkParser(schemes = setOf("sample", "https"), hosts = setOf("sample.example"))
-    .apply { registerAllDeepLinks() }
+  perchParser(schemes = setOf("sample", "https"), hosts = setOf("sample.example"))

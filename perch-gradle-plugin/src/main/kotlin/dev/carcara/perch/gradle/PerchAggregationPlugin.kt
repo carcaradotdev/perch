@@ -18,17 +18,14 @@ import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinUsages
 private val GRAPH_CONFIGURATIONS = listOf("commonMainImplementation", "commonMainApi")
 
 public abstract class PerchAggregationExtension {
-  /** Package the generated `registerAllDeepLinks()` extension is emitted into. Required. */
+  /** Package the generated `perchParser()` factory is emitted into. Required. */
   public abstract val outputPackage: Property<String>
-
-  /** Fully qualified name of the parser the generated extension is declared on. */
-  public abstract val parserClass: Property<String>
 }
 
 /**
  * Aggregator side of the Perch build pipeline. Collects the route manifest published by every
  * module reachable through this module's own dependencies and generates a single
- * `registerAllDeepLinks()` extension into `commonMain`.
+ * `perchParser()` factory into `commonMain`.
  *
  * The graph it walks is this module's `commonMain` compile graph, so what it can discover is
  * exactly what this module can compile against. A producer reachable only through another module's
@@ -45,7 +42,6 @@ public class PerchAggregationPlugin : Plugin<Project> {
   override fun apply(project: Project) {
     val extension =
       project.extensions.create("perchAggregation", PerchAggregationExtension::class.java)
-    extension.parserClass.convention("dev.carcara.perch.DeepLinkParser")
 
     val outputDirectory = project.layout.buildDirectory.dir("generated/perch/commonMain/kotlin")
     val generate = project.tasks.register(
@@ -53,9 +49,8 @@ public class PerchAggregationPlugin : Plugin<Project> {
       GenerateDeepLinkRegistration::class.java,
     ) {
       group = "build"
-      description = "Generates registerAllDeepLinks() from every reachable route manifest"
+      description = "Generates perchParser() from every reachable route manifest"
       outputPackage.set(extension.outputPackage)
-      parserClass.set(extension.parserClass)
       this.outputDirectory.set(outputDirectory)
     }
 

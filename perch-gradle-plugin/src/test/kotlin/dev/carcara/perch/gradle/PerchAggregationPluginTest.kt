@@ -153,7 +153,7 @@ class PerchAggregationPluginTest {
 
     assertEquals(TaskOutcome.SUCCESS, result.task(":app:generateDeepLinkRegistration")?.outcome)
     val text = generated().readText()
-    assertTrue(text.contains("public fun DeepLinkParser.registerAllDeepLinks()"))
+    assertTrue(text, text.contains("public fun perchParser("))
     assertFalse(text.contains("register<"))
     // The fail-open path is indistinguishable from an empty graph, so it has to say so out loud.
     assertTrue(result.output.contains("no deep-link routes were discovered"))
