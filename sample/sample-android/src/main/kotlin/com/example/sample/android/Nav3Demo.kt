@@ -9,8 +9,8 @@ import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
-import com.example.sample.routes.HomeLink
-import com.example.sample.routes.PaymentLink
+import com.example.sample.home.api.HomeDeepLink
+import com.example.sample.payments.api.PaymentRoutes
 
 /**
  * Navigation 3, where the deep link needs no adapter at all.
@@ -28,8 +28,8 @@ fun Nav3Demo(route: Any?) {
   // `@DeepLink` being `@MetaSerializable` pays off - nav3 asks that keys be serializable, and the
   // routes are, without a second annotation on them.
   val backStack = when (val deepLinked = route as? NavKey) {
-    null, is HomeLink -> rememberNavBackStack(HomeLink())
-    else -> rememberNavBackStack(HomeLink(), deepLinked)
+    null, is HomeDeepLink -> rememberNavBackStack(HomeDeepLink)
+    else -> rememberNavBackStack(HomeDeepLink, deepLinked)
   }
 
   NavDisplay(
@@ -37,18 +37,25 @@ fun Nav3Demo(route: Any?) {
     modifier = Modifier.fillMaxSize(),
     onBack = { backStack.removeLastOrNull() },
     entryProvider = entryProvider<NavKey> {
-      entry<HomeLink> {
+      entry<HomeDeepLink> {
         DestinationBody(
           screen = "Home",
           detail = "The start of the back stack.",
           note = "Opened from HomeLink, or as the entry this demo always starts on.",
         ) {
-          Button(onClick = { backStack.add(PaymentLink("from-in-app")) }) {
+          Button(onClick = { backStack.add(PaymentRoutes.Details("from-in-app")) }) {
             Text("Push a payment")
           }
         }
       }
-      entry<PaymentLink> { key ->
+      entry<PaymentRoutes.Approvals> {
+        DestinationBody(
+          screen = "Approvals",
+          detail = "The payments waiting on someone.",
+          note = "The payments feature owns two links; this is the one with no parameters.",
+        )
+      }
+      entry<PaymentRoutes.Details> { key ->
         DestinationBody(
           screen = "Payment",
           detail = "id = ${key.id}",

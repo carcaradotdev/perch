@@ -12,8 +12,8 @@ import cafe.adriel.voyager.navigator.CurrentScreen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.Navigator
 import cafe.adriel.voyager.navigator.currentOrThrow
-import com.example.sample.routes.HomeLink
-import com.example.sample.routes.PaymentLink
+import com.example.sample.home.api.HomeDeepLink
+import com.example.sample.payments.api.PaymentRoutes
 
 /**
  * Voyager, where the deep link needs one mapping function.
@@ -42,8 +42,9 @@ fun VoyagerDemo(route: Any?) {
 
 /** The route-to-screen mapping. Perch hands back the route; picking the screen is the app's call. */
 private fun Any?.toScreen(): Screen? = when (this) {
-  is HomeLink -> VoyagerHome
-  is PaymentLink -> VoyagerPaymentScreen(id)
+  is HomeDeepLink -> VoyagerHome
+  is PaymentRoutes.Details -> VoyagerPaymentScreen(id)
+  is PaymentRoutes.Approvals -> VoyagerApprovalsScreen
   else -> null
 }
 
@@ -64,6 +65,18 @@ private data object VoyagerHome : Screen {
         Text("Push a payment")
       }
     }
+  }
+}
+
+private data object VoyagerApprovalsScreen : Screen {
+
+  @Composable
+  override fun Content() {
+    DestinationBody(
+      screen = "Approvals",
+      detail = "The payments waiting on someone.",
+      note = "The payments feature owns two links; this is the one with no parameters.",
+    )
   }
 }
 

@@ -13,8 +13,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.example.sample.routes.HomeLink
-import com.example.sample.routes.PaymentLink
+import com.example.sample.home.api.HomeDeepLink
+import com.example.sample.navigation.SampleRoute
+import com.example.sample.payments.api.PaymentRoutes
 
 /**
  * How a parsed route reads on screen.
@@ -22,11 +23,12 @@ import com.example.sample.routes.PaymentLink
  * Routes are plain classes with no `toString`, which is the point: Perch hands back an object of
  * the app's own type, and rendering it is the app's business.
  */
-fun describeRoute(route: Any?): String = when (route) {
-  is HomeLink -> "HomeLink"
-  is PaymentLink -> "PaymentLink(id = ${route.id})"
+fun describeRoute(route: Any?): String = when (val known = route as? SampleRoute) {
+  is HomeDeepLink -> "HomeDeepLink"
+  is PaymentRoutes.Details -> "PaymentRoutes.Details(id = ${known.id})"
+  is PaymentRoutes.Approvals -> "PaymentRoutes.Approvals"
   null -> "null — no route matched this URL"
-  else -> route::class.simpleName ?: "unknown route"
+  else -> known::class.simpleName ?: "unknown route"
 }
 
 /** The title bar every demo screen wears, with the back affordance the shell listens for. */

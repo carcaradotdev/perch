@@ -36,11 +36,18 @@ rootProject.name = "perch"
 include(":perch-core")
 include(":perch-ksp")
 
-// The sample is not published. `sample-routes` and `sample-app` run the whole KSP-and-aggregation
-// pipeline; `sample-android` is an installable app that takes the route objects that pipeline
-// produces and hands them to three different navigation libraries. Naming these paths also creates
-// the intermediate project `:sample`, which has no build file and no source of its own.
-include(":sample:sample-routes")
+// The sample is not published. It is laid out the way an app that uses Perch is laid out: each
+// feature owns the links it can be entered by, in its own `api` module applying the producer
+// plugin, and one module aggregates them. With two producers the aggregation step is doing
+// something a single-producer sample could not show.
+//
+// `sample-android` is an installable app that takes the route objects that pipeline produces and
+// hands them to two multiplatform navigation libraries. Naming these paths also creates the
+// intermediate projects `:sample` and `:sample:features`, which have no build file and no source
+// of their own.
+include(":sample:sample-navigation")
+include(":sample:features:home:api")
+include(":sample:features:payments:api")
 include(":sample:sample-app")
 include(":sample:sample-android")
 
@@ -56,8 +63,18 @@ include(":sample:sample-android")
 // which conflicts with the Kotlin Multiplatform plugin. A convention plugin applied per-project
 // keeps that classpath isolated to the projects that opt into it.
 gradle.lifecycle.beforeProject {
-  // The root project itself is excluded, matching what `subprojects { }` used to cover.
-  if (path == ":") return@beforeProject
+  // Only the modules that publish. `group` and `version` are publishing coordinates, and pinning
+  // them on everything is what breaks a build whose leaf module names repeat: the sample's two
+  // feature modules are both called `api`, so a uniform group makes both `dev.carcara.perch:api`
+  // and Gradle resolves the collision by substituting one for the other -
+  //
+  //     project ':sample:features:payments:api' -> project ':sample:features:home:api'
+  //
+  // which silently drops a whole feature's deep links from the aggregated parser. Left alone, a
+  // subproject's group defaults to its parent path, which is unique by construction. Feature
+  // modules named `api` and `impl` are the common layout in the apps Perch is for, so the sample
+  // is laid out that way and this rule has to survive it.
+  if (path !in setOf(":perch-core", ":perch-ksp")) return@beforeProject
 
   group = "dev.carcara.perch"
   version = "0.1.0-SNAPSHOT"

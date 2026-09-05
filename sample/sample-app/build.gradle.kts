@@ -6,9 +6,9 @@ plugins {
 }
 
 kotlin {
-  // The same targets sample-routes declares. Aggregation generates into commonMain, so every
+  // The same targets the feature modules declare. Aggregation generates into commonMain, so every
   // target compiles the generated file, and a mismatch here would leave a target of this module
-  // with no variant of sample-routes to resolve against.
+  // with no variant of a feature to resolve against.
   androidLibrary {
     namespace = "com.example.sample.app"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
@@ -20,11 +20,18 @@ kotlin {
 
   sourceSets {
     commonMain.dependencies {
-      // Both `api`, because both show up in this module's own signatures: `sampleParser()`
-      // returns a `DeepLinkParser`, and what it parses to are sample-routes' types. That is what
-      // lets `sample-android` navigate with one dependency on this module.
+      // All `api`, because all three show up in this module's own signatures: `sampleParser()`
+      // returns a `DeepLinkParser`, and what it parses to are the features' types, narrowed
+      // through `SampleRoute`. That is what lets `sample-android` navigate with one dependency
+      // on this module.
+      //
+      // They are also how the aggregator finds anything: it walks this module's own commonMain
+      // dependencies for published manifests, so a feature reachable only from a platform source
+      // set would be silently missing from `perchParser()`.
       api(projects.perchCore)
-      api(projects.sample.sampleRoutes)
+      api(projects.sample.sampleNavigation)
+      api(projects.sample.features.home.api)
+      api(projects.sample.features.payments.api)
     }
     commonTest.dependencies {
       implementation(libs.kotlin.test)

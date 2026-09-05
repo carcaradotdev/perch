@@ -24,6 +24,8 @@ android {
 kotlin { jvmToolchain(21) }
 
 dependencies {
+  // One dependency: sample-app `api`-exposes the parser, the shared route supertype and both
+  // features' route types, so the app names the aggregator and gets everything it navigates to.
   implementation(projects.sample.sampleApp)
 
   implementation(platform(libs.compose.bom))
