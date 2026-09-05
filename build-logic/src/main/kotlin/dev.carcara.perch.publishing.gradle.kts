@@ -4,7 +4,6 @@
 // https://docs.gradle.org/current/userguide/isolated_projects.html
 
 apply(plugin = "com.vanniktech.maven.publish")
-apply(plugin = "org.jetbrains.kotlinx.binary-compatibility-validator")
 
 // Captured before entering `pom { }` below, where a bare `name` would resolve to the pom
 // builder's own `name` property instead of this project's.

@@ -294,7 +294,7 @@ supply one.
 ## Status
 
 `perch-core` and `perch-ksp` publish to `mavenLocal()`, alongside both Gradle plugin markers, and
-both library modules are under a binary-compatibility (`apiCheck`/`apiDump`) guard. Maven Central
+`perch-core` is under a binary-compatibility (`apiCheck`/`apiDump`) guard. Maven Central
 publishing is not yet wired up — it needs a Sonatype Central Portal account, a verified
 `dev.carcara` namespace, and a GPG key, on top of the publishing already in place.
 
@@ -311,7 +311,7 @@ root build's task graph:
 ./gradlew -p build-logic build                                   # the convention plugins
 ```
 
-`./gradlew build` runs `check`, which runs `apiCheck` for every published module and detekt over
+`./gradlew build` runs `check`, which runs `apiCheck` for `perch-core` and detekt over
 every main source set — fails if you've broken binary compatibility without running `apiDump`, or
 introduced a lint violation. Test sources are not linted. It also builds and tests `sample/`,
 which exercises the whole KSP and aggregation pipeline end to end; if a change to either plugin
