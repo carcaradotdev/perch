@@ -33,7 +33,14 @@ class MainActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     enableEdgeToEdge()
-    incoming = intent?.dataString?.let(::IncomingUrl)
+
+    // Only on a fresh start. A recreated activity - a rotation, a font-size change - is handed the
+    // same VIEW intent again, and reading it here unconditionally would look like the link had just
+    // arrived a second time: the app would jump back to the picker and throw away whatever screen
+    // the reader was on. `savedInstanceState` is what tells the two apart.
+    if (savedInstanceState == null) {
+      incoming = intent?.dataString?.let(::IncomingUrl)
+    }
 
     setContent {
       MaterialTheme(

@@ -4,11 +4,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
+import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import com.example.sample.routes.HomeLink
 import com.example.sample.routes.PaymentLink
@@ -24,11 +23,13 @@ import com.example.sample.routes.PaymentLink
  */
 @Composable
 fun Nav3Demo(route: Any?) {
-  val backStack = remember(route) {
-    when (val deepLinked = route as? NavKey) {
-      null, is HomeLink -> NavBackStack<NavKey>(HomeLink())
-      else -> NavBackStack<NavKey>(HomeLink(), deepLinked)
-    }
+  // `rememberNavBackStack`, not `remember`: the latter dies with the composition, so a rotation
+  // would drop the reader back to Home. This one saves and restores the stack, and it is where
+  // `@DeepLink` being `@MetaSerializable` pays off - nav3 asks that keys be serializable, and the
+  // routes are, without a second annotation on them.
+  val backStack = when (val deepLinked = route as? NavKey) {
+    null, is HomeLink -> rememberNavBackStack(HomeLink())
+    else -> rememberNavBackStack(HomeLink(), deepLinked)
   }
 
   NavDisplay(
