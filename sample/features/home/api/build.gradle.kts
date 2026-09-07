@@ -16,9 +16,8 @@ kotlin {
     minSdk = libs.versions.android.sampleMinSdk.get().toInt()
   }
 
-  // Three targets, and at least two of them are a requirement rather than a preference: Perch
-  // scans commonMain, and Kotlin Multiplatform only gives a module a commonMain compilation once
-  // it declares two or more targets.
+  // Two targets minimum, because Perch scans commonMain and Kotlin Multiplatform only gives a
+  // module a commonMain compilation once it declares two or more.
   jvm()
   iosSimulatorArm64()
 
@@ -35,7 +34,7 @@ kotlin {
 
 perch {
   outputPackage.set("com.example.sample.home.api")
-  // A project path rather than the `dev.carcara.perch:perch-ksp:<version>` convention, because
-  // the processor lives in this build. A consumer outside this repository leaves it alone.
+  // A project path because the processor lives in this build; a consumer leaves this unset and
+  // gets the published `dev.carcara.perch:perch-ksp` coordinate.
   processorCoordinates.set(projects.perchKsp.path)
 }

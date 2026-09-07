@@ -15,11 +15,11 @@ import com.example.sample.payments.api.PaymentRoutes
 /**
  * Navigation 3, where the deep link needs no adapter at all.
  *
- * `NavBackStack` holds `NavKey`s, and sample-routes' routes implement `NavKey` — which they are
- * free to do because Perch demands no supertype of its own. So the object `parse` returned is
- * already the object the back stack accepts: pushing it is an `add`, and matching on it is the
- * same `entry<PaymentLink>` an in-app navigation would use. There is no second set of types
- * mirroring the routes, and no mapping function to keep in step with them.
+ * `NavBackStack` holds `NavKey`s, and these routes implement `NavKey` through `SampleRoute` —
+ * which they are free to do because Perch demands no supertype of its own. So the object `parse`
+ * returned is already the object the back stack accepts: pushing it is an `add`, and matching on it
+ * is the same `entry<PaymentRoutes.Details>` an in-app navigation would use. There is no second set
+ * of types mirroring the routes, and no mapping function to keep in step with them.
  */
 @Composable
 fun Nav3Demo(route: Any?) {
@@ -41,7 +41,7 @@ fun Nav3Demo(route: Any?) {
         DestinationBody(
           screen = "Home",
           detail = "The start of the back stack.",
-          note = "Opened from HomeLink, or as the entry this demo always starts on.",
+          note = "Opened from HomeDeepLink, or as the entry this demo always starts on.",
         ) {
           Button(onClick = { backStack.add(PaymentRoutes.Details("from-in-app")) }) {
             Text("Push a payment")
@@ -52,7 +52,7 @@ fun Nav3Demo(route: Any?) {
         DestinationBody(
           screen = "Approvals",
           detail = "The payments waiting on someone.",
-          note = "The payments feature owns two links; this is the one with no parameters.",
+          note = "This link carries no parameters, so the key on the back stack is the object itself.",
         )
       }
       entry<PaymentRoutes.Details> { key ->

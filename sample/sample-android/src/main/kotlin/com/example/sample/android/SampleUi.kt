@@ -14,7 +14,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.sample.home.api.HomeDeepLink
-import com.example.sample.navigation.SampleRoute
 import com.example.sample.payments.api.PaymentRoutes
 
 /**
@@ -23,12 +22,12 @@ import com.example.sample.payments.api.PaymentRoutes
  * Routes are plain classes with no `toString`, which is the point: Perch hands back an object of
  * the app's own type, and rendering it is the app's business.
  */
-fun describeRoute(route: Any?): String = when (val known = route as? SampleRoute) {
+fun describeRoute(route: Any?): String = when (route) {
   is HomeDeepLink -> "HomeDeepLink"
-  is PaymentRoutes.Details -> "PaymentRoutes.Details(id = ${known.id})"
+  is PaymentRoutes.Details -> "PaymentRoutes.Details(id = ${route.id})"
   is PaymentRoutes.Approvals -> "PaymentRoutes.Approvals"
   null -> "null — no route matched this URL"
-  else -> known::class.simpleName ?: "unknown route"
+  else -> route::class.simpleName ?: "unknown route"
 }
 
 /** The title bar every demo screen wears, with the back affordance the shell listens for. */
@@ -43,7 +42,7 @@ fun ScreenHeader(title: String, onBack: () -> Unit) {
   }
 }
 
-/** A labelled one-line rendering of a route, used by the picker and by all three demos. */
+/** A labelled one-line rendering of a route, used by the picker and by both demos. */
 @Composable
 fun RouteReadout(label: String, route: Any?) {
   Surface(

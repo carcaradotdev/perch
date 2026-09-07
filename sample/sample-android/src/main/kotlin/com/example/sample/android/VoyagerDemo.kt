@@ -59,7 +59,7 @@ private data object VoyagerHome : Screen {
     DestinationBody(
       screen = "Home",
       detail = "The bottom of the Voyager stack.",
-      note = "Reached from HomeLink, or as the screen this demo always starts on.",
+      note = "Reached from HomeDeepLink, or as the screen this demo always starts on.",
     ) {
       Button(onClick = { navigator.push(VoyagerPaymentScreen("from-in-app")) }) {
         Text("Push a payment")
@@ -75,7 +75,7 @@ private data object VoyagerApprovalsScreen : Screen {
     DestinationBody(
       screen = "Approvals",
       detail = "The payments waiting on someone.",
-      note = "The payments feature owns two links; this is the one with no parameters.",
+      note = "toScreen() maps this one to an object rather than a class: there is no id to carry.",
     )
   }
 }
@@ -87,7 +87,7 @@ private data class VoyagerPaymentScreen(val id: String) : Screen {
     DestinationBody(
       screen = "Payment",
       detail = "id = $id",
-      note = "toScreen() carried PaymentLink.id across; back pops to Home.",
+      note = "toScreen() carried PaymentRoutes.Details.id across; back pops to Home.",
     )
   }
 }

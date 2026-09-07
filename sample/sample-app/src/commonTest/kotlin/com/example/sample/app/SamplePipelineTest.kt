@@ -29,10 +29,12 @@ class SamplePipelineTest {
 
   @Test
   fun `narrowing to the app's own supertype types everything past the cast`() {
+    val parser = sampleParser()
+
     // `SampleRoute` cannot be sealed - its implementations live in other modules - so this `when`
     // keeps an `else`. What the cast buys is that every branch below it is a route type, and that
     // "not one of ours" is one branch rather than a condition repeated at every call site.
-    fun landingFor(url: String) = when (val route = sampleParser().parse(url) as? SampleRoute) {
+    fun landingFor(url: String) = when (val route = parser.parse(url) as? SampleRoute) {
       is HomeDeepLink -> "home"
       is PaymentRoutes.Details -> "payment ${route.id}"
       is PaymentRoutes.Approvals -> "approvals"

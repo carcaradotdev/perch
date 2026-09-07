@@ -17,7 +17,7 @@ import androidx.compose.runtime.setValue
  * The whole sample app. One activity, one job: turn the URL Android handed it into a route object,
  * and hand that object to whichever navigation library the reader picked on the first screen.
  *
- * Perch's part is the single `parse` call in [SampleShell]. Everything below that is the three
+ * Perch's part is the single `parse` call in [SampleShell]. Everything below that is the two
  * navigators being themselves.
  */
 class MainActivity : ComponentActivity() {

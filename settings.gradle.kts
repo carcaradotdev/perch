@@ -51,43 +51,25 @@ include(":sample:features:payments:api")
 include(":sample:sample-app")
 include(":sample:sample-android")
 
-// Isolated Projects forbids `subprojects { }` (it is cross-project access from root-project
-// scope). `beforeProject` registered here runs once per project in an isolated context private
-// to that project, which is the sanctioned replacement: see
+// Detekt is opt-in per module: `id("dev.carcara.perch.detekt")` in that module's own `plugins { }`
+// block. Isolated Projects forbids `subprojects { }` - it is cross-project access from root-project
+// scope - so a convention plugin each module applies to itself is the sanctioned shape here, and
+// the one the publishing coordinates use too. See
 // https://docs.gradle.org/current/userguide/isolated_projects.html
 //
-// Detekt's own application, its extension configuration and the `check` -> `Detekt` task wiring
-// live in the `dev.carcara.perch.detekt` convention plugin (see `build-logic/`) instead of here:
-// adding the detekt Gradle plugin to this settings script's own classpath, so this block could
-// reference `DetektExtension` directly, puts it on the classloader every project script shares -
-// which conflicts with the Kotlin Multiplatform plugin. A convention plugin applied per-project
-// keeps that classpath isolated to the projects that opt into it.
-gradle.lifecycle.beforeProject {
-  // Only the modules that publish. `group` and `version` are publishing coordinates, and pinning
-  // them on everything is what breaks a build whose leaf module names repeat: the sample's two
-  // feature modules are both called `api`, so a uniform group makes both `dev.carcara.perch:api`
-  // and Gradle resolves the collision by substituting one for the other -
-  //
-  //     project ':sample:features:payments:api' -> project ':sample:features:home:api'
-  //
-  // which silently drops a whole feature's deep links from the aggregated parser. Left alone, a
-  // subproject's group defaults to its parent path, which is unique by construction. Feature
-  // modules named `api` and `impl` are the common layout in the apps Perch is for, so the sample
-  // is laid out that way and this rule has to survive it.
-  if (path !in setOf(":perch-core", ":perch-ksp")) return@beforeProject
-
-  group = "dev.carcara.perch"
-  version = "0.1.0-SNAPSHOT"
-}
-
-// Detekt coverage is opt-in per module now (`id("dev.carcara.perch.detekt")` in that module's own
-// `plugins { }` block) rather than automatic the way `subprojects { }` used to make it. A module
-// that forgets the line gets no error and `check` still goes green while nothing lints it - the
-// same gate-reports-success-while-checking-nothing failure this task exists to close, just moved
-// up from per-source-set blindness to per-module blindness. Fail loudly instead: once a project
-// has finished evaluating (so its own `plugins { }` block has already run), confirm it applied the
-// convention plugin. Reading `pluginManager` here is this project inspecting its own state from
-// within its own isolated `afterProject` context, not reaching into a neighbour.
+// The detekt Gradle plugin also stays off this script's classpath deliberately, which is why its
+// extension and its `check` -> `Detekt` task wiring live in the convention plugin rather than in a
+// block below. Adding it here so a block could reference `DetektExtension` directly would put it on
+// the classloader every project script shares, which conflicts with the Kotlin Multiplatform
+// plugin.
+//
+// What opting in costs is that a module which forgets the line gets no error, and `check` goes
+// green while nothing lints it - the same gate-reports-success-while-checking-nothing failure the
+// task exists to close, moved up from per-source-set blindness to per-module blindness. So fail
+// loudly: once a project has finished evaluating, and its own `plugins { }` block has therefore
+// run, confirm it applied the convention plugin. Reading `pluginManager` here is this project
+// inspecting its own state from within its own isolated `afterProject` context, not reaching into
+// a neighbour.
 gradle.lifecycle.afterProject {
   // What is exempt is decided by what a project compiles, not by what it applies or what it is
   // called: a project with no Kotlin compilation gives detekt nothing to lint, so requiring the

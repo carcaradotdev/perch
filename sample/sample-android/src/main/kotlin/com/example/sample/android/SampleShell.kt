@@ -52,9 +52,8 @@ private enum class Demo(val title: String, val summary: String) {
 /**
  * The picker, and whichever demo is open on top of it.
  *
- * The `parse` call below is Perch's entire part in this app. What comes back is a route object of
- * sample-routes' own types, or null; from there the three demos differ only in what they do with
- * that object.
+ * The `parse` call below is Perch's entire part in this app. What comes back is one of the features'
+ * own route types, or null; from there the two demos differ only in what they do with that object.
  */
 @Composable
 fun SampleShell(incoming: IncomingUrl?) {
