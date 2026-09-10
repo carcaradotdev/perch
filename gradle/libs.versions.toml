@@ -2,7 +2,12 @@
 agp = "9.2.1"
 android-compileSdk = "36"
 android-minSdk = "21"
+# The sample app's own floor, above the library's: navigation3-runtime declares minSdk 23, and the
+# manifest merger refuses to build the app below it. Perch itself still installs on 21.
+android-sampleMinSdk = "23"
+androidxActivity = "1.13.0"
 binaryCompatibilityValidator = "0.18.1"
+composeBom = "2026.06.01"
 detekt = "1.23.8"
 junit = "4.13.2"
 kctfork = "0.13.0"
@@ -11,6 +16,8 @@ kotlinx-serialization = "1.11.0"
 ksp = "2.3.10"
 ktor = "3.5.1"
 mavenPublish = "0.37.0"
+navigation3 = "1.1.7"
+voyager = "1.1.0-beta03"
 
 [libraries]
 ktor-resources = { module = "io.ktor:ktor-resources", version.ref = "ktor" }
@@ -26,8 +33,20 @@ detekt-gradlePlugin = { module = "io.gitlab.arturbosch.detekt:detekt-gradle-plug
 mavenPublish-gradlePlugin = { module = "com.vanniktech:gradle-maven-publish-plugin", version.ref = "mavenPublish" }
 binaryCompatibilityValidator-gradlePlugin = { module = "org.jetbrains.kotlinx:binary-compatibility-validator", version.ref = "binaryCompatibilityValidator" }
 
+# Everything below here is used by the sample app only. Perch itself depends on
+# kotlinx-serialization-core and nothing else.
+androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidxActivity" }
+compose-bom = { module = "androidx.compose:compose-bom", version.ref = "composeBom" }
+compose-material3 = { module = "androidx.compose.material3:material3" }
+compose-ui = { module = "androidx.compose.ui:ui" }
+navigation3-runtime = { module = "androidx.navigation3:navigation3-runtime", version.ref = "navigation3" }
+navigation3-ui = { module = "androidx.navigation3:navigation3-ui", version.ref = "navigation3" }
+voyager-navigator = { module = "cafe.adriel.voyager:voyager-navigator", version.ref = "voyager" }
+
 [plugins]
+androidApplication = { id = "com.android.application", version.ref = "agp" }
 androidKmpLibrary = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
+composeCompiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 kotlinSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }

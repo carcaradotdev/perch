@@ -36,11 +36,13 @@ rootProject.name = "perch"
 include(":perch-core")
 include(":perch-ksp")
 
-// The sample is not published; it exists to run the whole KSP-and-aggregation pipeline. Naming
-// these two paths also creates the intermediate project `:sample`, which has no build file and no
-// source of its own.
+// The sample is not published. `sample-routes` and `sample-app` run the whole KSP-and-aggregation
+// pipeline; `sample-android` is an installable app that takes the route objects that pipeline
+// produces and hands them to three different navigation libraries. Naming these paths also creates
+// the intermediate project `:sample`, which has no build file and no source of its own.
 include(":sample:sample-routes")
 include(":sample:sample-app")
+include(":sample:sample-android")
 
 // Isolated Projects forbids `subprojects { }` (it is cross-project access from root-project
 // scope). `beforeProject` registered here runs once per project in an isolated context private
@@ -70,19 +72,24 @@ gradle.lifecycle.beforeProject {
 // convention plugin. Reading `pluginManager` here is this project inspecting its own state from
 // within its own isolated `afterProject` context, not reaching into a neighbour.
 gradle.lifecycle.afterProject {
-  // What is exempt is decided structurally, not by name: a project that applies no Kotlin plugin
-  // compiles nothing, so detekt would have no source to lint there and requiring the convention
-  // plugin would only be noise. That covers the root project, and it covers the container project
-  // Gradle creates implicitly for a nested path - `include(":sample:sample-app")` brings `:sample`
-  // into the build with no build file and no source. A hardcoded path list would have to grow an
-  // entry every time either of those appears, and an entry added to silence an error is exactly
-  // how a real module ends up exempt by accident.
-  val kotlinPluginIds = listOf(
-    "org.jetbrains.kotlin.multiplatform",
-    "org.jetbrains.kotlin.jvm",
-    "org.jetbrains.kotlin.android",
-  )
-  if (kotlinPluginIds.none { pluginManager.hasPlugin(it) }) return@afterProject
+  // What is exempt is decided by what a project compiles, not by what it applies or what it is
+  // called: a project with no Kotlin compilation gives detekt nothing to lint, so requiring the
+  // convention plugin there would only be noise. That covers the root project, and it covers the
+  // container project Gradle creates implicitly for a nested path - `include(":sample:sample-app")`
+  // brings `:sample` into the build with no build file and no source.
+  //
+  // Asking for the `kotlin` extension rather than for plugin ids is what keeps this honest. A list
+  // of Kotlin Gradle Plugin ids looks structural and is not: AGP 9 compiles Kotlin itself, so
+  // `sample-android` applies `com.android.application` and no `org.jetbrains.kotlin.*` plugin at
+  // all, and a check written against those ids waves it through - silently exempting the newest
+  // module in the build, which is the one most likely to be copied. Whoever sets up the Kotlin
+  // compilation registers the extension, so this holds for the multiplatform, jvm and android
+  // plugins alike, for AGP's built-in Kotlin, and for whatever supersedes them.
+  //
+  // The compile tasks would be a more direct signal and are not available yet: AGP registers its
+  // per-variant tasks after this callback runs, so at this point `sample-android` has no
+  // `compileDebugKotlin` to find.
+  if (extensions.findByName("kotlin") == null) return@afterProject
 
   if (!pluginManager.hasPlugin("dev.carcara.perch.detekt")) {
     throw GradleException(

@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application
+        android:label="Perch sample"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar">
+
+        <!--
+          `singleTask` so a deep link fired while the app is already running arrives at the
+          existing activity through onNewIntent, rather than stacking a second copy of it.
+        -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask">
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!--
+              The custom scheme sampleParser() is configured with, declared here so Android routes
+              it to this activity:
+
+                adb shell am start -a android.intent.action.VIEW -d "sample://payments/abc123"
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="sample" />
+            </intent-filter>
+
+            <!--
+              The https host, matching the `hosts` sampleParser() is configured with. Firing it
+              from adb opens the browser rather than this app: an https link only reaches an app
+              once Android has verified it against a Digital Asset Links file served from that
+              domain, which sample.example is not. It is here because a real app declares this
+              pair, and because Perch's host check is what guards the app when it does.
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:host="sample.example"
+                    android:scheme="https" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>
