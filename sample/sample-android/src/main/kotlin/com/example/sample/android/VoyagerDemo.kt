@@ -12,8 +12,8 @@ import cafe.adriel.voyager.navigator.CurrentScreen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.Navigator
 import cafe.adriel.voyager.navigator.currentOrThrow
-import com.example.sample.routes.HomeLink
-import com.example.sample.routes.PaymentLink
+import com.example.sample.home.api.HomeDeepLink
+import com.example.sample.payments.api.PaymentRoutes
 
 /**
  * Voyager, where the deep link needs one mapping function.
@@ -42,8 +42,9 @@ fun VoyagerDemo(route: Any?) {
 
 /** The route-to-screen mapping. Perch hands back the route; picking the screen is the app's call. */
 private fun Any?.toScreen(): Screen? = when (this) {
-  is HomeLink -> VoyagerHome
-  is PaymentLink -> VoyagerPaymentScreen(id)
+  is HomeDeepLink -> VoyagerHome
+  is PaymentRoutes.Details -> VoyagerPaymentScreen(id)
+  is PaymentRoutes.Approvals -> VoyagerApprovalsScreen
   else -> null
 }
 
@@ -58,12 +59,24 @@ private data object VoyagerHome : Screen {
     DestinationBody(
       screen = "Home",
       detail = "The bottom of the Voyager stack.",
-      note = "Reached from HomeLink, or as the screen this demo always starts on.",
+      note = "Reached from HomeDeepLink, or as the screen this demo always starts on.",
     ) {
       Button(onClick = { navigator.push(VoyagerPaymentScreen("from-in-app")) }) {
         Text("Push a payment")
       }
     }
+  }
+}
+
+private data object VoyagerApprovalsScreen : Screen {
+
+  @Composable
+  override fun Content() {
+    DestinationBody(
+      screen = "Approvals",
+      detail = "The payments waiting on someone.",
+      note = "toScreen() maps this one to an object rather than a class: there is no id to carry.",
+    )
   }
 }
 
@@ -74,7 +87,7 @@ private data class VoyagerPaymentScreen(val id: String) : Screen {
     DestinationBody(
       screen = "Payment",
       detail = "id = $id",
-      note = "toScreen() carried PaymentLink.id across; back pops to Home.",
+      note = "toScreen() carried PaymentRoutes.Details.id across; back pops to Home.",
     )
   }
 }

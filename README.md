@@ -73,10 +73,22 @@ regardless of the targets of the module they process, so it does not need to be.
 
 ## Quick start
 
-This walks through the same thing `sample/` in this repository builds and tests end to end. The
-snippets follow it, with one difference: the sample's routes also implement Navigation 3's `NavKey`,
-which its app screen needs and Perch does not care about either way. See
-[Handing the route to a navigator](#handing-the-route-to-a-navigator).
+This walks through the same thing `sample/` in this repository builds and tests end to end, in a
+single-feature form. The sample itself is laid out the way an app is - a `sample-navigation` module
+holding a route supertype, two features each owning the links they can be entered by, an aggregator,
+and an installable Android app:
+
+```
+sample/
+  sample-navigation/            SampleRoute, the supertype the app narrows to
+  features/home/api/            @DeepLink("/home")                    ← producer
+  features/payments/api/        @DeepLink("/payments/{id}") + one more ← producer
+  sample-app/                   perchParser() over both features       ← aggregator
+  sample-android/               one activity, two navigators
+```
+
+Two producers rather than one is the point of that shape: it is the only way the aggregation step
+does something a single module could not do for itself.
 
 ### 1. Declare a route
 
@@ -217,11 +229,12 @@ when (val target = appParser().parse("myapp://payments/abc123")) {
 }
 ```
 
-`parse` returns `Any?`, because Perch does not decide what your routes have in common. If you group
-them under a sealed type of your own, narrow once and the `when` is exhaustive with no `else`:
+`parse` returns `Any?`, because Perch does not decide what your routes have in common. Give your
+routes a supertype of your own and you narrow once, after which everything is typed and "not one of
+ours" is a single branch:
 
 ```kotlin
-sealed interface Route
+interface Route
 
 @DeepLink("/home")
 class HomeLink : Route
@@ -229,9 +242,14 @@ class HomeLink : Route
 when (val target = appParser().parse(url) as? Route) {
     is PaymentLink -> ...
     is HomeLink -> ...
-    null -> ...
+    else -> ...
 }
 ```
+
+Seal that type and the `when` loses its `else` as well — but only if every route lives in the module
+that declares the supertype, because Kotlin permits implementations of a sealed type nowhere else.
+An app that splits routes across feature modules, which is the layout the sample uses, gets the
+narrowing and not the exhaustiveness.
 
 That is the whole surface: a route object, or `null`. Deciding when to act on it, how to navigate,
 and whether the user is allowed to land there is your app's own logic, sitting on top of whatever
@@ -298,8 +316,8 @@ Two Gradle plugins, applied to different modules:
   producers). It walks this module's own `commonMain` dependency graph, collects every manifest it
   can reach, and generates the registration function.
 
-A module can apply either, both, or neither — the sample's `sample-routes` applies only the
-producer plugin and `sample-app` applies only the aggregator, which is the common shape.
+A module can apply either, both, or neither — each of the sample's two feature modules applies only
+the producer plugin and `sample-app` applies only the aggregator, which is the common shape.
 
 Two properties of this pipeline are worth knowing before you hit them as a mystery:
 
