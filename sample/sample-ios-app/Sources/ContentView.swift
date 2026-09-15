@@ -1,13 +1,9 @@
 import SwiftUI
 import SampleShared
 
-/// The picker, and whatever the selected URL resolves to.
-///
-/// Worth comparing against `sample-android`: there, Navigation 3 takes the parsed object onto its
-/// back stack with no adapter because the routes implement `NavKey`. Here the object goes onto a
-/// SwiftUI `NavigationPath` with no adapter either, and for a reason nobody designed for - every
-/// Kotlin class exported to Objective-C is an `NSObject` subclass, Kotlin's `equals`/`hashCode`
-/// become `isEqual`/`hash`, and that is exactly what Swift's `Hashable` is built from.
+/// The parsed route goes onto `NavigationPath` with no adapter: a Kotlin class exported to
+/// Objective-C is an `NSObject` subclass, its `equals`/`hashCode` become `isEqual`/`hash`, and that
+/// is what Swift builds `Hashable` from.
 struct ContentView: View {
 
   @ObservedObject var shell: Shell
@@ -38,15 +34,10 @@ struct ContentView: View {
   }
 }
 
-/// The one `switch` the app writes, and the counterpart of `describeRoute` on the Android side.
+/// The counterpart of `describeRoute` on the Android side.
 ///
-/// It answers both questions at once — what the route is called, and what a screen for it shows —
-/// so adding a route is one case here rather than a case in each of three switches that can drift
-/// into disagreeing about the same object.
-///
-/// Note the flattening: Kotlin's `PaymentRoutes.Details` is `PaymentRoutesDetails` here. The
-/// Objective-C bridge has no nested types, so the nesting a feature uses to group its links
-/// becomes part of the name.
+/// Objective-C has no nested types, so Kotlin's `PaymentRoutes.Details` is `PaymentRoutesDetails`
+/// here — a feature's grouping becomes part of the name.
 private func describe(_ route: Any?) -> (name: String, screen: String, detail: String) {
   let onTheStack = "The object on the NavigationPath is the one parse() returned."
   switch route {

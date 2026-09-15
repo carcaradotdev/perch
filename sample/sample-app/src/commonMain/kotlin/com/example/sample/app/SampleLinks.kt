@@ -1,13 +1,6 @@
 package com.example.sample.app
 
-/**
- * The links the sample demonstrates.
- *
- * Here rather than in either shell because both read from it: the iOS picker lists [all], and both
- * pickers start on [DEFAULT]. A literal repeated in two shells drifts the first time a route
- * changes shape, and nothing would catch it - the two would quietly stop demonstrating the same
- * link.
- */
+/** The links the sample demonstrates, here rather than in either shell because both read them. */
 public object SampleLinks {
 
   /** What a picker starts on. */

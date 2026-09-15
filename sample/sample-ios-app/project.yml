@@ -1,6 +1,5 @@
-# The Xcode project is generated from this file rather than committed as a pbxproj: a pbxproj is
-# thousands of lines of machine-written plist that nobody reviews and every Xcode version rewrites.
-# `xcodegen generate` in this directory produces SampleIos.xcodeproj from what is below.
+# `xcodegen generate` in this directory produces SampleIos.xcodeproj from this file, which is the
+# reviewable artefact; the pbxproj is not committed.
 name: SampleIos
 options:
   bundleIdPrefix: com.example.sample
@@ -22,24 +21,16 @@ targets:
       properties:
         UILaunchScreen: {}
         CFBundleURLTypes:
-          # What makes this a deep-link demo rather than a URL-parsing demo: the scheme is
-          # registered with the OS, so `xcrun simctl openurl sample://...` arrives at onOpenURL.
-          #
-          # Only the custom scheme, and there is no line that would add the https one. An https
-          # link reaches an iOS app through Universal Links, which need an
-          # apple-app-site-association file served from sample.example over HTTPS and an
-          # associated-domains entitlement signed into the app - neither of which a sample owning
-          # no domain can have. Sent to the OS, `https://sample.example/...` opens Safari.
-          #
-          # Perch is not the part that differs: the picker parses that same URL to
-          # PaymentRoutes.Details, host check included. What differs is who hands the app the
-          # string, which is the platform's business and not a deep-link library's.
+          # The custom scheme only, and no line here could add the https one: an https link reaches
+          # an iOS app through Universal Links, needing an apple-app-site-association file on a
+          # domain this sample does not own. Sent to the OS, https://sample.example/... opens
+          # Safari. The picker still parses it, host check included - what differs is who hands the
+          # app the string.
           - CFBundleURLName: com.example.sample
             CFBundleURLSchemes: [sample]
     settings:
       base:
-        # The framework is static, so linking is the whole story - there is no embed-and-sign phase
-        # and nothing to copy into the bundle.
+        # Static, so there is no embed-and-sign phase.
         FRAMEWORK_SEARCH_PATHS: $(SRCROOT)/../sample-app/build/bin/iosSimulatorArm64/debugFramework
         OTHER_LDFLAGS: -framework SampleShared
     preBuildScripts:
