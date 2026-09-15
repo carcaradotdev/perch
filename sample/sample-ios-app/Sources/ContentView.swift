@@ -20,7 +20,7 @@ struct ContentView: View {
         }
 
         Section("Resolves to") {
-          Text(describe(shell.route))
+          Text(describe(shell.route).name)
             .font(.system(.footnote, design: .monospaced))
             .foregroundStyle(shell.route == nil ? .secondary : .primary)
         }
@@ -40,16 +40,27 @@ struct ContentView: View {
 
 /// The one `switch` the app writes, and the counterpart of `describeRoute` on the Android side.
 ///
+/// It answers both questions at once — what the route is called, and what a screen for it shows —
+/// so adding a route is one case here rather than a case in each of three switches that can drift
+/// into disagreeing about the same object.
+///
 /// Note the flattening: Kotlin's `PaymentRoutes.Details` is `PaymentRoutesDetails` here. The
 /// Objective-C bridge has no nested types, so the nesting a feature uses to group its links
 /// becomes part of the name.
-private func describe(_ route: Any?) -> String {
+private func describe(_ route: Any?) -> (name: String, screen: String, detail: String) {
+  let onTheStack = "The object on the NavigationPath is the one parse() returned."
   switch route {
-  case is HomeDeepLink: return "HomeDeepLink"
-  case let details as PaymentRoutesDetails: return "PaymentRoutes.Details(id = \(details.id))"
-  case is PaymentRoutesApprovals: return "PaymentRoutes.Approvals"
-  case .none: return "null — no route matched this URL"
-  default: return String(describing: type(of: route!))
+  case is HomeDeepLink:
+    return ("HomeDeepLink", "Home", onTheStack)
+  case let details as PaymentRoutesDetails:
+    return ("PaymentRoutes.Details(id = \(details.id))", "Payment", "id = \(details.id)")
+  case is PaymentRoutesApprovals:
+    return ("PaymentRoutes.Approvals", "Approvals", onTheStack)
+  case .none:
+    return ("null — no route matched this URL", "Nothing", onTheStack)
+  default:
+    let name = String(describing: type(of: route!))
+    return (name, name, onTheStack)
   }
 }
 
@@ -58,24 +69,11 @@ private struct Destination: View {
   let route: NSObject
 
   var body: some View {
+    let resolved = describe(route)
     VStack(spacing: 12) {
-      Text(screen).font(.title2.bold())
-      Text(detail).font(.system(.footnote, design: .monospaced)).foregroundStyle(.secondary)
+      Text(resolved.screen).font(.title2.bold())
+      Text(resolved.detail).font(.system(.footnote, design: .monospaced)).foregroundStyle(.secondary)
     }
     .padding()
-  }
-
-  private var screen: String {
-    switch route {
-    case is HomeDeepLink: return "Home"
-    case is PaymentRoutesDetails: return "Payment"
-    case is PaymentRoutesApprovals: return "Approvals"
-    default: return "Unknown"
-    }
-  }
-
-  private var detail: String {
-    if let details = route as? PaymentRoutesDetails { return "id = \(details.id)" }
-    return "The object on the NavigationPath is the one parse() returned."
   }
 }

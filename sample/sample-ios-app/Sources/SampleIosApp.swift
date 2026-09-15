@@ -26,11 +26,16 @@ final class Shell: ObservableObject {
 
   private let parser = SampleAppKt.sampleParser()
 
-  @Published var url: String = SampleLinks.shared.DEFAULT
+  @Published private(set) var url: String
+  @Published private(set) var route: Any?
   @Published var path = NavigationPath()
 
-  /// What Perch does, in one line, and it is the same line the Android shell runs.
-  var route: Any? { parser.parse(url: url) }
+  /// Starts resolved rather than blank, so the picker shows what a link does before anything is
+  /// tapped. `url` and `route` only ever change together, in `open`.
+  init() {
+    url = SampleLinks.shared.DEFAULT
+    route = parser.parse(url: SampleLinks.shared.DEFAULT)
+  }
 
   /// Opening a link is the whole demo: parse it, and go where it points.
   ///
@@ -43,9 +48,13 @@ final class Shell: ObservableObject {
   /// `null` is an answer, not a failure.
   func open(_ link: String) {
     url = link
+    // What Perch does, in one line, and it is the same line the Android shell runs. Stored rather
+    // than recomputed from `url`: a computed property would re-cross the Objective-C bridge and
+    // re-run the parser on every SwiftUI body evaluation, including ones caused by `path`.
+    route = parser.parse(url: link)
     path = NavigationPath()
-    if let route = parser.parse(url: link) as? NSObject {
-      path.append(route)
+    if let destination = route as? NSObject {
+      path.append(destination)
     }
   }
 }

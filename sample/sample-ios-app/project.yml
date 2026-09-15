@@ -40,10 +40,10 @@ targets:
       base:
         # The framework is static, so linking is the whole story - there is no embed-and-sign phase
         # and nothing to copy into the bundle.
-        FRAMEWORK_SEARCH_PATHS: $(SRCROOT)/../sample-ios/build/bin/iosSimulatorArm64/debugFramework
+        FRAMEWORK_SEARCH_PATHS: $(SRCROOT)/../sample-app/build/bin/iosSimulatorArm64/debugFramework
         OTHER_LDFLAGS: -framework SampleShared
     preBuildScripts:
       - name: Link the Kotlin framework
         script: |
-          cd "$SRCROOT/../.." && ./gradlew :sample:sample-ios:linkDebugFrameworkIosSimulatorArm64
+          cd "$SRCROOT/../.." && ./gradlew :sample:sample-app:linkDebugFrameworkIosSimulatorArm64
         basedOnDependencyAnalysis: false

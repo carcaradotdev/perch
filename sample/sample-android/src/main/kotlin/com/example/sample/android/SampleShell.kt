@@ -20,16 +20,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.example.sample.app.SampleLinks
 import com.example.sample.app.sampleParser
-
-/** The URL the picker opens with, so the app is useful without reaching for `adb`. */
-private const val DEFAULT_URL = "sample://payments/abc123"
-
-/**
- * One arrival of one URL, carried by identity rather than by value: firing the same deep link a
- * second time is a second arrival, and the app should react to it again.
- */
-class IncomingUrl(val url: String)
 
 /**
  * The demos, in the order the picker lists them.
@@ -58,7 +50,7 @@ private enum class Demo(val title: String, val summary: String) {
 @Composable
 fun SampleShell(incoming: IncomingUrl?) {
   val parser = remember { sampleParser() }
-  var url by rememberSaveable { mutableStateOf(DEFAULT_URL) }
+  var url by rememberSaveable { mutableStateOf(SampleLinks.DEFAULT) }
   var demo by rememberSaveable { mutableStateOf<Demo?>(null) }
 
   // A link that arrives while the app is running takes over the box and returns to the picker, so
