@@ -23,7 +23,17 @@ targets:
         UILaunchScreen: {}
         CFBundleURLTypes:
           # What makes this a deep-link demo rather than a URL-parsing demo: the scheme is
-          # registered with the OS, so `xcrun simctl openurl` and a tap in Safari both arrive here.
+          # registered with the OS, so `xcrun simctl openurl sample://...` arrives at onOpenURL.
+          #
+          # Only the custom scheme, and there is no line that would add the https one. An https
+          # link reaches an iOS app through Universal Links, which need an
+          # apple-app-site-association file served from sample.example over HTTPS and an
+          # associated-domains entitlement signed into the app - neither of which a sample owning
+          # no domain can have. Sent to the OS, `https://sample.example/...` opens Safari.
+          #
+          # Perch is not the part that differs: the picker parses that same URL to
+          # PaymentRoutes.Details, host check included. What differs is who hands the app the
+          # string, which is the platform's business and not a deep-link library's.
           - CFBundleURLName: com.example.sample
             CFBundleURLSchemes: [sample]
     settings:

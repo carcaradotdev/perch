@@ -23,14 +23,11 @@ struct ContentView: View {
           Text(describe(shell.route))
             .font(.system(.footnote, design: .monospaced))
             .foregroundStyle(shell.route == nil ? .secondary : .primary)
-          if let route = shell.route as? NSObject {
-            Button("Navigate") { shell.path.append(route) }
-          }
         }
 
         Section("Try a link") {
           ForEach(SampleLinks.shared.all, id: \.self) { link in
-            Button(link) { shell.url = link }
+            Button(link) { shell.open(link) }
               .font(.system(.footnote, design: .monospaced))
           }
         }
