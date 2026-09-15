@@ -50,6 +50,7 @@ include(":sample:features:home:api")
 include(":sample:features:payments:api")
 include(":sample:sample-app")
 include(":sample:sample-android")
+include(":sample:sample-ios")
 
 // Detekt is opt-in per module: `id("dev.carcara.perch.detekt")` in that module's own `plugins { }`
 // block. Isolated Projects forbids `subprojects { }` - it is cross-project access from root-project
