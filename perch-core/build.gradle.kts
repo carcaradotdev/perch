@@ -6,6 +6,8 @@ plugins {
   id("dev.carcara.perch.publishing")
 }
 
+description = "The Perch runtime: the parser, the registry and the `@DeepLink` annotation"
+
 kotlin {
   explicitApi()
 
