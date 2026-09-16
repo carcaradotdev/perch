@@ -62,12 +62,20 @@ fun SampleShell(incoming: IncomingUrl?) {
   var url by rememberSaveable { mutableStateOf(SampleLinks.DEFAULT) }
   var demo by rememberSaveable { mutableStateOf<Demo?>(null) }
 
-  // A link that arrives while the app is running takes over the box and returns to the picker, so
-  // the reader can choose which navigator they want to watch receive it.
   LaunchedEffect(incoming) {
     if (incoming != null) {
       url = incoming.url
-      demo = null
+
+      // Every link the OS delivers goes through the graph, not only the ones the DI demo's button
+      // asks about. Without this line the router would be a thing a button calls, and the path a
+      // deep link actually takes on Android would be the one part of the sample nothing exercises.
+      app.open(incoming.url)
+
+      // The two navigator demos are handed a route somebody else parsed, so a link arriving while
+      // one of them is open returns to the picker and lets the reader choose which receives it.
+      // The DI demo did the routing itself, so it keeps the screen: the reader is already where
+      // the link sent them, which is what a deep link is supposed to do.
+      if (demo != Demo.Di) demo = null
     }
   }
 
