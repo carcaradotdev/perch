@@ -1,0 +1,138 @@
+name: Release
+
+# Publishing a GitHub release creates the tag, and the tag carries the version. Nothing in the tree
+# does: a checkout of main builds the snapshot named in `dev.carcara.perch.publishing`, and the
+# released number exists in one place that is also the announcement. There is no version bump
+# commit to forget and no way for the tag and the artifacts to disagree.
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+# One release at a time, and never cancelled. An upload killed halfway leaves a deployment in the
+# Portal that nobody asked for and that has to expire on its own.
+concurrency:
+  group: release-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  version:
+    # Reads the version out of the tag before anything expensive runs, so a mistyped tag costs ten
+    # seconds rather than the whole build.
+    name: version
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.tag.outputs.version }}
+    steps:
+      - name: Take the version from the tag
+        id: tag
+        env:
+          # Through the environment rather than interpolated into the script. A tag name is text an
+          # outside contributor can influence, and a value substituted into a run block is
+          # substituted before bash sees it.
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          version="${TAG#v}"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
+            echo "::error::tag '$TAG' is not a release version. Write v1.2.3 or 1.2.3, optionally suffixed -alpha01 or -RC1"
+            exit 1
+          fi
+          # A separate check because the pattern above cannot tell SNAPSHOT from any other
+          # prerelease word, and a snapshot version does not go through the Portal at all: the
+          # plugin would upload it to the snapshot repository and this job would quietly do nothing.
+          if [[ "$version" == *SNAPSHOT* ]]; then
+            echo "::error::tag '$TAG' names a snapshot. Releases are cut from a fixed version"
+            exit 1
+          fi
+          echo "Releasing $version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  verify:
+    # The same CI that runs on main, on the tagged commit. It has usually already passed there, and
+    # running it again is the point: a release is the one build where "it was green last week" does
+    # not answer the question.
+    name: verify
+    needs: version
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    name: publish
+    needs: [version, verify]
+    # macOS is the only host that can compile the Apple targets, and every target has to be in the
+    # deployment, so the library job below has to run here. The plugin build does not need a Mac
+    # and runs here anyway, because the two uploads belong to one release and splitting them across
+    # hosts would only add a way for one to happen without the other.
+    runs-on: macos-latest
+    timeout-minutes: 90
+    env:
+      # Everything the publish needs arrives as an environment variable and nothing is written to
+      # gradle.properties or passed on the command line. ORG_GRADLE_PROJECT_ is the prefix Gradle
+      # reads project properties from the environment under, and the one the publishing plugin
+      # documents for exactly this; the value never touches a file. The version goes the same way,
+      # so the tag is the only thing that decides what gets released.
+      ORG_GRADLE_PROJECT_version: ${{ needs.version.outputs.version }}
+      # A Central Portal user token, generated at https://central.sonatype.com/account, not the
+      # account login.
+      ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+      ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+      # The armoured private key in full, armour lines and line breaks included. An environment
+      # variable holds newlines, so it needs none of the stripping a gradle.properties entry would.
+      ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_IN_MEMORY_KEY }}
+      ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_IN_MEMORY_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Cache Kotlin/Native toolchain
+        uses: actions/cache@v4
+        with:
+          path: ~/.konan
+          key: konan-${{ runner.os }}-${{ hashFiles('gradle/libs.versions.toml') }}
+          restore-keys: konan-${{ runner.os }}-
+
+      # The smaller of the two builds goes first, so a credentials or signing problem surfaces in
+      # minutes rather than after the whole Apple matrix has linked.
+      #
+      # No configuration cache in either step: the signing key arrives as a project property and
+      # would be written into the cache entry on disk.
+      - name: Upload the Gradle plugins
+        run: ./gradlew -p perch-gradle-plugin publishToMavenCentral --no-configuration-cache
+
+      # Isolated Projects has to come off with it. It makes disabling the configuration cache an
+      # error rather than a setting - "Configuration Cache cannot be disabled when Isolated Projects
+      # is enabled" - so the flag above is refused on its own here. The plugin build takes no such
+      # flag because `-p` makes it the root of its own invocation, and the property that enables
+      # Isolated Projects lives in the root build's gradle.properties.
+      - name: Upload the library and the KSP processor
+        run: |
+          ./gradlew publishToMavenCentral \
+            -Dorg.gradle.unsafe.isolated-projects=false \
+            --no-configuration-cache
+
+      # `publishToMavenCentral`, not `publishAndReleaseToMavenCentral`. Two Gradle builds mean two
+      # Portal deployments, and no single upload can be the whole release: released automatically,
+      # a failure in the second step would leave the first already published and immutable, which
+      # is half a library on Maven Central and not something a later run can take back.
+      - name: Say what is waiting in the Portal
+        run: |
+          {
+            echo "### Two deployments are staged"
+            echo
+            echo "Version \`${ORG_GRADLE_PROJECT_version}\`:"
+            echo
+            echo "- \`dev.carcara.perch:perch-gradle-plugin\` and both plugin markers"
+            echo "- \`dev.carcara.perch:perch-core\` and \`dev.carcara.perch:perch-ksp\`"
+            echo
+            echo "Open <https://central.sonatype.com/publishing/deployments> and release them"
+            echo "together, or drop both. Nothing is public until you do."
+          } >> "$GITHUB_STEP_SUMMARY"

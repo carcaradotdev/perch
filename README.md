@@ -360,10 +360,26 @@ supply one.
 
 ## Status
 
-`perch-core` and `perch-ksp` publish to `mavenLocal()`, alongside both Gradle plugin markers, and
-both library modules are under a binary-compatibility (`apiCheck`/`apiDump`) guard. Maven Central
-publishing is not yet wired up — it needs a Sonatype Central Portal account, a verified
-`dev.carcara` namespace, and a GPG key, on top of the publishing already in place.
+No version has been released yet, so `mavenLocal()` is still how you consume Perch. Everything
+around that is in place: three artifacts — `perch-core`, `perch-ksp` and `perch-gradle-plugin`,
+the last alongside both plugin markers — publish under a binary-compatibility
+(`apiCheck`/`apiDump`) guard, each carries the sources jar, javadoc jar and complete POM Maven
+Central requires, and all three take their coordinates, licence, developer and SCM from one
+convention plugin so a release cannot describe one of them differently from the others.
+
+A release is a published GitHub Release whose tag is the version. The tag is the only place that
+number lives: `.github/workflows/release.yml` passes it to both builds as
+`ORG_GRADLE_PROJECT_version`, so there is no version bump commit and no way for the tag and the
+artifacts to disagree. What it needs from the repository is four secrets —
+`MAVEN_CENTRAL_USERNAME` and `MAVEN_CENTRAL_PASSWORD`, which are a Central Portal user token rather
+than an account login, and `SIGNING_IN_MEMORY_KEY` with `SIGNING_IN_MEMORY_KEY_PASSWORD` for the
+GPG key.
+
+The workflow uploads and stops. Perch ships from two separate Gradle builds, so the Portal receives
+two deployments and no single upload is the whole release; both sit staged at
+[central.sonatype.com/publishing/deployments](https://central.sonatype.com/publishing/deployments)
+until someone releases them together or drops both. Automatic release would mean a failure in the
+second upload leaving the first already public and immutable.
 
 ## Contributing
 
@@ -384,5 +400,11 @@ introduced a lint violation. Test sources are not linted. It also builds and tes
 which exercises the whole KSP and aggregation pipeline end to end; if a change to either plugin
 breaks the pipeline, the sample is what notices.
 
-Nothing runs them for you: there is no CI yet. Run all three before opening a pull request, on
-macOS — the Apple targets do not build on other platforms.
+CI runs all three for you on every pull request, in two jobs: `plugins` builds and tests
+`build-logic` and `perch-gradle-plugin` on Linux, and `library` runs the root build on macOS,
+which is the only host that can compile the Apple targets. Both finish by publishing to
+`mavenLocal()`, so a break in the POM or in the sources and javadoc jars fails a pull request
+rather than a release.
+
+Running them yourself before opening one is still faster than waiting, and needs macOS for the
+same reason.

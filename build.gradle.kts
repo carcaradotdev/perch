@@ -11,8 +11,7 @@ plugins {
   alias(libs.plugins.ksp) apply false
 }
 
-// Per-module group and version are set from `settings.gradle.kts`'s
-// `gradle.lifecycle.beforeProject { }`; detekt's application, its extension configuration and the
-// `check` -> `Detekt` task wiring live in the `dev.carcara.perch.detekt` convention plugin (see
-// `build-logic/`). `subprojects { }` is cross-project access from root-project scope, and
-// Isolated Projects forbids it outright.
+// Nothing else belongs here. `subprojects { }` is cross-project access from root-project scope and
+// Isolated Projects forbids it outright, so what would have gone in it lives in the convention
+// plugins under `build-logic/` that each module applies to itself: `dev.carcara.perch.detekt` for
+// linting, `dev.carcara.perch.publishing` for the coordinates, the POM and the Central Portal.
