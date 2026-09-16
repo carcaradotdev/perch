@@ -13,6 +13,10 @@ plugins {
 // because the aggregator walks this module's commonMain dependencies for published manifests - a
 // feature reachable only from a platform source set would be missing from `perchParser()`.
 // `export` is only honoured for an `api` dependency, so the two can never legally differ.
+//
+// `sample-di` is here for the second reason only: it publishes no manifest and adds nothing to
+// `perchParser()`. It is in this module's signatures - `SampleGraph` names its types - and Swift
+// has to be able to name them too.
 val exported = listOf(
   projects.perchCore,
   projects.sample.sampleNavigation,

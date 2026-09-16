@@ -56,6 +56,9 @@ private enum class Demo(val title: String, val summary: String) {
 @Composable
 fun SampleShell(incoming: IncomingUrl?) {
   val parser = remember { sampleParser() }
+  // Built here, not in the demo that uses it: the graph is scoped to the application, and this is
+  // the composable that lasts as long as the app does.
+  val app = remember { DemoApp() }
   var url by rememberSaveable { mutableStateOf(SampleLinks.DEFAULT) }
   var demo by rememberSaveable { mutableStateOf<Demo?>(null) }
 
@@ -77,7 +80,7 @@ fun SampleShell(incoming: IncomingUrl?) {
 
   when (val open = demo) {
     null -> DemoPicker(url = url, route = route, onUrlChange = { url = it }, onPick = { demo = it })
-    else -> OpenDemo(demo = open, url = url, route = route, onBack = { demo = null })
+    else -> OpenDemo(demo = open, app = app, url = url, route = route, onBack = { demo = null })
   }
 }
 
@@ -120,14 +123,14 @@ private fun DemoPicker(
 }
 
 @Composable
-private fun OpenDemo(demo: Demo, url: String, route: Any?, onBack: () -> Unit) {
+private fun OpenDemo(demo: Demo, app: DemoApp, url: String, route: Any?, onBack: () -> Unit) {
   Column(modifier = Modifier.fillMaxSize().safeContentPadding()) {
     ScreenHeader(title = demo.title, onBack = onBack)
     when (demo) {
       Demo.Nav3 -> Nav3Demo(route)
       Demo.Voyager -> VoyagerDemo(route)
       // The URL, not the route: this demo's parser lives in the graph, so parsing is its job.
-      Demo.Di -> DiDemo(url)
+      Demo.Di -> DiDemo(app, url)
     }
   }
 }

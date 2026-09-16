@@ -22,8 +22,5 @@ kotlin {
       api(projects.perchCore)
       api(projects.sample.sampleNavigation)
     }
-    commonTest.dependencies {
-      implementation(libs.kotlin.test)
-    }
   }
 }
