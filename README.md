@@ -73,10 +73,25 @@ regardless of the targets of the module they process, so it does not need to be.
 
 ## Quick start
 
-This walks through the same thing `sample/` in this repository builds and tests end to end. The
-snippets follow it, with one difference: the sample's routes also implement Navigation 3's `NavKey`,
-which its app screen needs and Perch does not care about either way. See
-[Handing the route to a navigator](#handing-the-route-to-a-navigator).
+This walks through the same thing `sample/` in this repository builds and tests end to end, in a
+single-feature form. The sample itself is laid out the way an app is - a `sample-navigation` module
+holding a route supertype, two features each owning the links they can be entered by, an aggregator,
+and an installable app on each platform:
+
+```
+sample/
+  sample-navigation/            SampleRoute, the supertype the app narrows to
+  features/home/api/            @DeepLink("/home")                    ← producer
+  features/payments/api/        @DeepLink("/payments/{id}") + one more ← producer
+  features/payments/impl/       the handler that gates the approvals link
+  sample-di/                    the router, and the seams the shells fill
+  sample-app/                   perchParser() over both features       ← aggregator
+  sample-android/               one activity, three demos
+  sample-ios-app/               SwiftUI, on the same parsed objects
+```
+
+Two producers rather than one is the point of that shape: it is the only way the aggregation step
+does something a single module could not do for itself.
 
 ### 1. Declare a route
 
@@ -217,11 +232,12 @@ when (val target = appParser().parse("myapp://payments/abc123")) {
 }
 ```
 
-`parse` returns `Any?`, because Perch does not decide what your routes have in common. If you group
-them under a sealed type of your own, narrow once and the `when` is exhaustive with no `else`:
+`parse` returns `Any?`, because Perch does not decide what your routes have in common. Give your
+routes a supertype of your own and you narrow once, after which everything is typed and "not one of
+ours" is a single branch:
 
 ```kotlin
-sealed interface Route
+interface Route
 
 @DeepLink("/home")
 class HomeLink : Route
@@ -229,9 +245,14 @@ class HomeLink : Route
 when (val target = appParser().parse(url) as? Route) {
     is PaymentLink -> ...
     is HomeLink -> ...
-    null -> ...
+    else -> ...
 }
 ```
+
+Seal that type and the `when` loses its `else` as well — but only if every route lives in the module
+that declares the supertype, because Kotlin permits implementations of a sealed type nowhere else.
+An app that splits routes across feature modules, which is the layout the sample uses, gets the
+narrowing and not the exhaustiveness.
 
 That is the whole surface: a route object, or `null`. Deciding when to act on it, how to navigate,
 and whether the user is allowed to land there is your app's own logic, sitting on top of whatever
@@ -280,6 +301,24 @@ fun Any?.toScreen(): Screen? = when (this) {
 }
 ```
 
+**Through a DI graph** is how an app of any size will reach the parser, and Perch occupies one
+provider in it:
+
+```kotlin
+@BindingContainer
+@ContributesTo(AppScope::class)
+object DeepLinkBindings {
+    @Provides
+    fun provideParser(): DeepLinkParser = appParser()
+}
+```
+
+From there nothing downstream names a feature, or knows a generator was involved. `sample-di` holds
+a router that injects that parser alongside a map of per-route handlers, and `features/payments/impl`
+contributes one handler into that map — so a feature declares the links it owns and what happens
+when one is opened, and neither needs a line in a central list. `sample-ios-app` implements the
+router's navigation seam in Swift, which is the same graph reached from the other side.
+
 Some navigators bring a deep-link feature of their own. It does not overlap with this one: Perch
 decides what a URL means while it is still a URL, and hands over a typed object; what happens to
 that object is the navigator's business.
@@ -298,8 +337,8 @@ Two Gradle plugins, applied to different modules:
   producers). It walks this module's own `commonMain` dependency graph, collects every manifest it
   can reach, and generates the registration function.
 
-A module can apply either, both, or neither — the sample's `sample-routes` applies only the
-producer plugin and `sample-app` applies only the aggregator, which is the common shape.
+A module can apply either, both, or neither — each of the sample's two feature modules applies only
+the producer plugin and `sample-app` applies only the aggregator, which is the common shape.
 
 Two properties of this pipeline are worth knowing before you hit them as a mystery:
 
@@ -342,10 +381,27 @@ supply one.
 
 ## Status
 
-`perch-core` and `perch-ksp` publish to `mavenLocal()`, alongside both Gradle plugin markers, and
-`perch-core` is under a binary-compatibility (`apiCheck`/`apiDump`) guard. Maven Central
-publishing is not yet wired up — it needs a Sonatype Central Portal account, a verified
-`dev.carcara` namespace, and a GPG key, on top of the publishing already in place.
+No version has been released yet, so `mavenLocal()` is still how you consume Perch. Everything
+around that is in place: three artifacts — `perch-core`, `perch-ksp` and `perch-gradle-plugin`,
+the last alongside both plugin markers — each carry the sources jar, javadoc jar and complete POM
+Maven Central requires, and all three take their coordinates, licence, developer and SCM from one
+convention plugin so a release cannot describe one of them differently from the others.
+`perch-core` is under a binary-compatibility (`apiCheck`/`apiDump`) guard; the processor and the
+plugin are not, because nothing is ever compiled against them.
+
+A release is a published GitHub Release whose tag is the version. The tag is the only place that
+number lives: `.github/workflows/release.yml` passes it to both builds as
+`ORG_GRADLE_PROJECT_version`, so there is no version bump commit and no way for the tag and the
+artifacts to disagree. What it needs from the repository is four secrets —
+`MAVEN_CENTRAL_USERNAME` and `MAVEN_CENTRAL_PASSWORD`, which are a Central Portal user token rather
+than an account login, and `SIGNING_IN_MEMORY_KEY` with `SIGNING_IN_MEMORY_KEY_PASSWORD` for the
+GPG key.
+
+The workflow uploads and stops. Perch ships from two separate Gradle builds, so the Portal receives
+two deployments and no single upload is the whole release; both sit staged at
+[central.sonatype.com/publishing/deployments](https://central.sonatype.com/publishing/deployments)
+until someone releases them together or drops both. Automatic release would mean a failure in the
+second upload leaving the first already public and immutable.
 
 ## Contributing
 
@@ -366,5 +422,11 @@ introduced a lint violation. Test sources are not linted. It also builds and tes
 which exercises the whole KSP and aggregation pipeline end to end; if a change to either plugin
 breaks the pipeline, the sample is what notices.
 
-Nothing runs them for you: there is no CI yet. Run all three before opening a pull request, on
-macOS — the Apple targets do not build on other platforms.
+CI runs all three for you on every pull request, in two jobs: `plugins` builds and tests
+`build-logic` and `perch-gradle-plugin` on Linux, and `library` runs the root build on macOS,
+which is the only host that can compile the Apple targets. Both finish by publishing to
+`mavenLocal()`, so a break in the POM or in the sources and javadoc jars fails a pull request
+rather than a release.
+
+Running them yourself before opening one is still faster than waiting, and needs macOS for the
+same reason.

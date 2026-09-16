@@ -36,41 +36,44 @@ rootProject.name = "perch"
 include(":perch-core")
 include(":perch-ksp")
 
-// The sample is not published. `sample-routes` and `sample-app` run the whole KSP-and-aggregation
-// pipeline; `sample-android` is an installable app that takes the route objects that pipeline
-// produces and hands them to three different navigation libraries. Naming these paths also creates
-// the intermediate project `:sample`, which has no build file and no source of its own.
-include(":sample:sample-routes")
+// The sample is not published. It is laid out the way an app that uses Perch is laid out: each
+// feature owns the links it can be entered by, in its own `api` module applying the producer
+// plugin, and one module aggregates them. With two producers the aggregation step is doing
+// something a single-producer sample could not show.
+//
+// `sample-android` is an installable app that takes the route objects that pipeline produces and
+// hands them to two multiplatform navigation libraries, and to a Metro graph that owns the parser.
+// `sample-di` holds that graph's seams and `payments:impl` contributes a handler into it, which is
+// the second half of the same story: a feature declares its links and what happens when one opens,
+// and a central list names neither. Naming these paths also creates the intermediate projects
+// `:sample` and `:sample:features`, which have no build file and no source of their own.
+include(":sample:sample-navigation")
+include(":sample:features:home:api")
+include(":sample:features:payments:api")
+include(":sample:features:payments:impl")
+include(":sample:sample-di")
 include(":sample:sample-app")
 include(":sample:sample-android")
 
-// Isolated Projects forbids `subprojects { }` (it is cross-project access from root-project
-// scope). `beforeProject` registered here runs once per project in an isolated context private
-// to that project, which is the sanctioned replacement: see
+// Detekt is opt-in per module: `id("dev.carcara.perch.detekt")` in that module's own `plugins { }`
+// block. Isolated Projects forbids `subprojects { }` - it is cross-project access from root-project
+// scope - so a convention plugin each module applies to itself is the sanctioned shape here, and
+// the one the publishing coordinates use too. See
 // https://docs.gradle.org/current/userguide/isolated_projects.html
 //
-// Detekt's own application, its extension configuration and the `check` -> `Detekt` task wiring
-// live in the `dev.carcara.perch.detekt` convention plugin (see `build-logic/`) instead of here:
-// adding the detekt Gradle plugin to this settings script's own classpath, so this block could
-// reference `DetektExtension` directly, puts it on the classloader every project script shares -
-// which conflicts with the Kotlin Multiplatform plugin. A convention plugin applied per-project
-// keeps that classpath isolated to the projects that opt into it.
-gradle.lifecycle.beforeProject {
-  // The root project itself is excluded, matching what `subprojects { }` used to cover.
-  if (path == ":") return@beforeProject
-
-  group = "dev.carcara.perch"
-  version = "0.1.0-SNAPSHOT"
-}
-
-// Detekt coverage is opt-in per module now (`id("dev.carcara.perch.detekt")` in that module's own
-// `plugins { }` block) rather than automatic the way `subprojects { }` used to make it. A module
-// that forgets the line gets no error and `check` still goes green while nothing lints it - the
-// same gate-reports-success-while-checking-nothing failure this task exists to close, just moved
-// up from per-source-set blindness to per-module blindness. Fail loudly instead: once a project
-// has finished evaluating (so its own `plugins { }` block has already run), confirm it applied the
-// convention plugin. Reading `pluginManager` here is this project inspecting its own state from
-// within its own isolated `afterProject` context, not reaching into a neighbour.
+// The detekt Gradle plugin also stays off this script's classpath deliberately, which is why its
+// extension and its `check` -> `Detekt` task wiring live in the convention plugin rather than in a
+// block below. Adding it here so a block could reference `DetektExtension` directly would put it on
+// the classloader every project script shares, which conflicts with the Kotlin Multiplatform
+// plugin.
+//
+// What opting in costs is that a module which forgets the line gets no error, and `check` goes
+// green while nothing lints it - the same gate-reports-success-while-checking-nothing failure the
+// task exists to close, moved up from per-source-set blindness to per-module blindness. So fail
+// loudly: once a project has finished evaluating, and its own `plugins { }` block has therefore
+// run, confirm it applied the convention plugin. Reading `pluginManager` here is this project
+// inspecting its own state from within its own isolated `afterProject` context, not reaching into
+// a neighbour.
 gradle.lifecycle.afterProject {
   // What is exempt is decided by what a project compiles, not by what it applies or what it is
   // called: a project with no Kotlin compilation gives detekt nothing to lint, so requiring the

@@ -4,6 +4,8 @@ plugins {
   id("dev.carcara.perch.publishing")
 }
 
+description = "The Perch KSP processor, which turns `@DeepLink` route classes into a registration file"
+
 kotlin {
   explicitApi()
   jvmToolchain(21)
