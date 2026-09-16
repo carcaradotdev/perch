@@ -11,14 +11,21 @@ struct ContentView: View {
   var body: some View {
     NavigationStack(path: $shell.path) {
       List {
-        Section("URL") {
-          Text(shell.url).font(.system(.footnote, design: .monospaced))
+        Section("Last opened") {
+          Text(shell.url ?? "Nothing yet")
+            .font(.system(.footnote, design: .monospaced))
+            .foregroundStyle(shell.url == nil ? .secondary : .primary)
+        }
+
+        Section("Session") {
+          Toggle("Signed in", isOn: $shell.signedIn)
+          Text("The payments module gates its approvals link on this. Nothing here knows that.")
+            .font(.footnote)
+            .foregroundStyle(.secondary)
         }
 
         Section("Resolves to") {
-          Text(describe(shell.route).name)
-            .font(.system(.footnote, design: .monospaced))
-            .foregroundStyle(shell.route == nil ? .secondary : .primary)
+          Outcome(routing: shell.routing)
         }
 
         Section("Try a link") {
@@ -34,12 +41,38 @@ struct ContentView: View {
   }
 }
 
+private struct Outcome: View {
+
+  let routing: (any Routing)?
+
+  var body: some View {
+    switch routing {
+    case let navigated as RoutingNavigated:
+      Text(describe(navigated.matched).name).font(.system(.footnote, design: .monospaced))
+      // Routes are NSObject subclasses, so `isEqual` is the Kotlin `equals` the data class wrote.
+      if (navigated.matched as? NSObject)?.isEqual(navigated.destination) == false {
+        Text("Redirected to \(describe(navigated.destination).name) by the payments handler.")
+          .font(.footnote)
+          .foregroundStyle(.secondary)
+      }
+    case is RoutingUnmatched:
+      Text("null — no route matched this URL")
+        .font(.system(.footnote, design: .monospaced))
+        .foregroundStyle(.secondary)
+    default:
+      Text("Tap a link below to send it through the router.")
+        .font(.footnote)
+        .foregroundStyle(.secondary)
+    }
+  }
+}
+
 /// The counterpart of `describeRoute` on the Android side.
 ///
 /// Objective-C has no nested types, so Kotlin's `PaymentRoutes.Details` is `PaymentRoutesDetails`
 /// here — a feature's grouping becomes part of the name.
 private func describe(_ route: Any?) -> (name: String, screen: String, detail: String) {
-  let onTheStack = "The object on the NavigationPath is the one parse() returned."
+  let onTheStack = "The object on the NavigationPath is the one the router chose."
   switch route {
   case is HomeDeepLink:
     return ("HomeDeepLink", "Home", onTheStack)

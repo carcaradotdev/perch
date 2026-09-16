@@ -3,17 +3,20 @@ import org.jetbrains.kotlin.gradle.plugin.mpp.NativeBuildType
 plugins {
   alias(libs.plugins.kotlinMultiplatform)
   alias(libs.plugins.androidKmpLibrary)
+  alias(libs.plugins.metro)
   id("dev.carcara.perch.aggregation")
   id("dev.carcara.perch.detekt")
 }
 
-// One list, read twice below. `api` because all four appear in this module's own signatures, and
+// One list, read twice below. `api` because each of these appears in this module's own signatures,
+// and
 // because the aggregator walks this module's commonMain dependencies for published manifests - a
 // feature reachable only from a platform source set would be missing from `perchParser()`.
 // `export` is only honoured for an `api` dependency, so the two can never legally differ.
 val exported = listOf(
   projects.perchCore,
   projects.sample.sampleNavigation,
+  projects.sample.sampleDi,
   projects.sample.features.home.api,
   projects.sample.features.payments.api,
 )
@@ -43,7 +46,14 @@ kotlin {
   }
 
   sourceSets {
-    commonMain.dependencies { exported.forEach(::api) }
+    commonMain.dependencies {
+      exported.forEach(::api)
+
+      // Not exported and not `api`: this module is here so its contributed handler is on the
+      // compile classpath when the graph is generated, which is the only way the graph learns of
+      // it. Nothing in this module names a type from it.
+      implementation(projects.sample.features.payments.impl)
+    }
     commonTest.dependencies {
       implementation(libs.kotlin.test)
     }

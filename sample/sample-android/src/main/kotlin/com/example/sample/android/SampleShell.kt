@@ -28,7 +28,8 @@ import com.example.sample.app.sampleParser
  *
  * Both navigators here are Kotlin Multiplatform. That is the bar for being in this sample: Perch
  * parses one URL into one route object for every target, so a navigator that only ships an Android
- * artifact has nothing to say about that.
+ * artifact has nothing to say about that. The third demo is not a navigator at all - it is the
+ * same parse reached through a dependency graph.
  */
 private enum class Demo(val title: String, val summary: String) {
   Nav3(
@@ -39,13 +40,18 @@ private enum class Demo(val title: String, val summary: String) {
     title = "Voyager",
     summary = "A Screen is UI, so the route maps to one here, where the UI already lives.",
   ),
+  Di(
+    title = "Dependency injection",
+    summary = "The parser is a binding. The screen hands over a URL and never names it.",
+  ),
 }
 
 /**
  * The picker, and whichever demo is open on top of it.
  *
- * The `parse` call below is Perch's entire part in this app. What comes back is one of the features'
- * own route types, or null; from there the two demos differ only in what they do with that object.
+ * The `parse` call below is Perch's entire part in this screen. What comes back is one of the
+ * features' own route types, or null; from there the demos differ only in what they do with it -
+ * except the last, which is handed the URL and does its own parsing inside a graph.
  */
 @Composable
 fun SampleShell(incoming: IncomingUrl?) {
@@ -71,7 +77,7 @@ fun SampleShell(incoming: IncomingUrl?) {
 
   when (val open = demo) {
     null -> DemoPicker(url = url, route = route, onUrlChange = { url = it }, onPick = { demo = it })
-    else -> OpenDemo(demo = open, route = route, onBack = { demo = null })
+    else -> OpenDemo(demo = open, url = url, route = route, onBack = { demo = null })
   }
 }
 
@@ -114,12 +120,14 @@ private fun DemoPicker(
 }
 
 @Composable
-private fun OpenDemo(demo: Demo, route: Any?, onBack: () -> Unit) {
+private fun OpenDemo(demo: Demo, url: String, route: Any?, onBack: () -> Unit) {
   Column(modifier = Modifier.fillMaxSize().safeContentPadding()) {
     ScreenHeader(title = demo.title, onBack = onBack)
     when (demo) {
       Demo.Nav3 -> Nav3Demo(route)
       Demo.Voyager -> VoyagerDemo(route)
+      // The URL, not the route: this demo's parser lives in the graph, so parsing is its job.
+      Demo.Di -> DiDemo(url)
     }
   }
 }
