@@ -76,15 +76,18 @@ regardless of the targets of the module they process, so it does not need to be.
 This walks through the same thing `sample/` in this repository builds and tests end to end, in a
 single-feature form. The sample itself is laid out the way an app is - a `sample-navigation` module
 holding a route supertype, two features each owning the links they can be entered by, an aggregator,
-and an installable Android app:
+and an installable app on each platform:
 
 ```
 sample/
   sample-navigation/            SampleRoute, the supertype the app narrows to
   features/home/api/            @DeepLink("/home")                    ← producer
   features/payments/api/        @DeepLink("/payments/{id}") + one more ← producer
+  features/payments/impl/       the handler that gates the approvals link
+  sample-di/                    the router, and the seams the shells fill
   sample-app/                   perchParser() over both features       ← aggregator
-  sample-android/               one activity, two navigators
+  sample-android/               one activity, three demos
+  sample-ios-app/               SwiftUI, on the same parsed objects
 ```
 
 Two producers rather than one is the point of that shape: it is the only way the aggregation step
@@ -297,6 +300,24 @@ fun Any?.toScreen(): Screen? = when (this) {
     else -> null
 }
 ```
+
+**Through a DI graph** is how an app of any size will reach the parser, and Perch occupies one
+provider in it:
+
+```kotlin
+@BindingContainer
+@ContributesTo(AppScope::class)
+object DeepLinkBindings {
+    @Provides
+    fun provideParser(): DeepLinkParser = appParser()
+}
+```
+
+From there nothing downstream names a feature, or knows a generator was involved. `sample-di` holds
+a router that injects that parser alongside a map of per-route handlers, and `features/payments/impl`
+contributes one handler into that map — so a feature declares the links it owns and what happens
+when one is opened, and neither needs a line in a central list. `sample-ios-app` implements the
+router's navigation seam in Swift, which is the same graph reached from the other side.
 
 Some navigators bring a deep-link feature of their own. It does not overlap with this one: Perch
 decides what a URL means while it is still a URL, and hands over a typed object; what happens to

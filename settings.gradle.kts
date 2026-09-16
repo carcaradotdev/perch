@@ -42,12 +42,16 @@ include(":perch-ksp")
 // something a single-producer sample could not show.
 //
 // `sample-android` is an installable app that takes the route objects that pipeline produces and
-// hands them to two multiplatform navigation libraries. Naming these paths also creates the
-// intermediate projects `:sample` and `:sample:features`, which have no build file and no source
-// of their own.
+// hands them to two multiplatform navigation libraries, and to a Metro graph that owns the parser.
+// `sample-di` holds that graph's seams and `payments:impl` contributes a handler into it, which is
+// the second half of the same story: a feature declares its links and what happens when one opens,
+// and a central list names neither. Naming these paths also creates the intermediate projects
+// `:sample` and `:sample:features`, which have no build file and no source of their own.
 include(":sample:sample-navigation")
 include(":sample:features:home:api")
 include(":sample:features:payments:api")
+include(":sample:features:payments:impl")
+include(":sample:sample-di")
 include(":sample:sample-app")
 include(":sample:sample-android")
 

@@ -20,23 +20,16 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.example.sample.app.SampleLinks
 import com.example.sample.app.sampleParser
-
-/** The URL the picker opens with, so the app is useful without reaching for `adb`. */
-private const val DEFAULT_URL = "sample://payments/abc123"
-
-/**
- * One arrival of one URL, carried by identity rather than by value: firing the same deep link a
- * second time is a second arrival, and the app should react to it again.
- */
-class IncomingUrl(val url: String)
 
 /**
  * The demos, in the order the picker lists them.
  *
  * Both navigators here are Kotlin Multiplatform. That is the bar for being in this sample: Perch
  * parses one URL into one route object for every target, so a navigator that only ships an Android
- * artifact has nothing to say about that.
+ * artifact has nothing to say about that. The third demo is not a navigator at all - it is the
+ * same parse reached through a dependency graph.
  */
 private enum class Demo(val title: String, val summary: String) {
   Nav3(
@@ -47,18 +40,26 @@ private enum class Demo(val title: String, val summary: String) {
     title = "Voyager",
     summary = "A Screen is UI, so the route maps to one here, where the UI already lives.",
   ),
+  Di(
+    title = "Dependency injection",
+    summary = "The parser is a binding. The screen hands over a URL and never names it.",
+  ),
 }
 
 /**
  * The picker, and whichever demo is open on top of it.
  *
- * The `parse` call below is Perch's entire part in this app. What comes back is one of the features'
- * own route types, or null; from there the two demos differ only in what they do with that object.
+ * The `parse` call below is Perch's entire part in this screen. What comes back is one of the
+ * features' own route types, or null; from there the demos differ only in what they do with it -
+ * except the last, which is handed the URL and does its own parsing inside a graph.
  */
 @Composable
 fun SampleShell(incoming: IncomingUrl?) {
   val parser = remember { sampleParser() }
-  var url by rememberSaveable { mutableStateOf(DEFAULT_URL) }
+  // Built here, not in the demo that uses it: the graph is scoped to the application, and this is
+  // the composable that lasts as long as the app does.
+  val app = remember { DemoApp() }
+  var url by rememberSaveable { mutableStateOf(SampleLinks.DEFAULT) }
   var demo by rememberSaveable { mutableStateOf<Demo?>(null) }
 
   // A link that arrives while the app is running takes over the box and returns to the picker, so
@@ -79,7 +80,7 @@ fun SampleShell(incoming: IncomingUrl?) {
 
   when (val open = demo) {
     null -> DemoPicker(url = url, route = route, onUrlChange = { url = it }, onPick = { demo = it })
-    else -> OpenDemo(demo = open, route = route, onBack = { demo = null })
+    else -> OpenDemo(demo = open, app = app, url = url, route = route, onBack = { demo = null })
   }
 }
 
@@ -122,12 +123,14 @@ private fun DemoPicker(
 }
 
 @Composable
-private fun OpenDemo(demo: Demo, route: Any?, onBack: () -> Unit) {
+private fun OpenDemo(demo: Demo, app: DemoApp, url: String, route: Any?, onBack: () -> Unit) {
   Column(modifier = Modifier.fillMaxSize().safeContentPadding()) {
     ScreenHeader(title = demo.title, onBack = onBack)
     when (demo) {
       Demo.Nav3 -> Nav3Demo(route)
       Demo.Voyager -> VoyagerDemo(route)
+      // The URL, not the route: this demo's parser lives in the graph, so parsing is its job.
+      Demo.Di -> DiDemo(app, url)
     }
   }
 }

@@ -14,11 +14,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 
 /**
- * The whole sample app. One activity, one job: turn the URL Android handed it into a route object,
- * and hand that object to whichever navigation library the reader picked on the first screen.
- *
- * Perch's part is the single `parse` call in [SampleShell]. Everything below that is the two
- * navigators being themselves.
+ * The whole sample app. One activity, one job: get the URL Android handed it to whichever demo the
+ * reader picked on the first screen.
  */
 class MainActivity : ComponentActivity() {
 

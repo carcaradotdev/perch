@@ -13,6 +13,7 @@ junit = "4.13.2"
 kctfork = "0.13.0"
 kotlin = "2.4.10"
 kotlinx-serialization = "1.11.0"
+metro = "1.4.3"
 ksp = "2.3.10"
 ktor = "3.5.1"
 mavenPublish = "0.37.0"
@@ -49,4 +50,5 @@ androidKmpLibrary = { id = "com.android.kotlin.multiplatform.library", version.r
 composeCompiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 kotlinSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+metro = { id = "dev.zacsweers.metro", version.ref = "metro" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
