@@ -383,10 +383,11 @@ supply one.
 
 No version has been released yet, so `mavenLocal()` is still how you consume Perch. Everything
 around that is in place: three artifacts — `perch-core`, `perch-ksp` and `perch-gradle-plugin`,
-the last alongside both plugin markers — publish under a binary-compatibility
-(`apiCheck`/`apiDump`) guard, each carries the sources jar, javadoc jar and complete POM Maven
-Central requires, and all three take their coordinates, licence, developer and SCM from one
+the last alongside both plugin markers — each carry the sources jar, javadoc jar and complete POM
+Maven Central requires, and all three take their coordinates, licence, developer and SCM from one
 convention plugin so a release cannot describe one of them differently from the others.
+`perch-core` is under a binary-compatibility (`apiCheck`/`apiDump`) guard; the processor and the
+plugin are not, because nothing is ever compiled against them.
 
 A release is a published GitHub Release whose tag is the version. The tag is the only place that
 number lives: `.github/workflows/release.yml` passes it to both builds as
@@ -415,7 +416,7 @@ root build's task graph:
 ./gradlew -p build-logic build                                   # the convention plugins
 ```
 
-`./gradlew build` runs `check`, which runs `apiCheck` for every published module and detekt over
+`./gradlew build` runs `check`, which runs `apiCheck` for `perch-core` and detekt over
 every main source set — fails if you've broken binary compatibility without running `apiDump`, or
 introduced a lint violation. Test sources are not linted. It also builds and tests `sample/`,
 which exercises the whole KSP and aggregation pipeline end to end; if a change to either plugin

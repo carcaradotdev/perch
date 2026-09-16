@@ -4,6 +4,7 @@ plugins {
   alias(libs.plugins.kotlinSerialization)
   id("dev.carcara.perch.detekt")
   id("dev.carcara.perch.publishing")
+  id("dev.carcara.perch.api-validation")
 }
 
 description = "The Perch runtime: the parser, the registry and the `@DeepLink` annotation"

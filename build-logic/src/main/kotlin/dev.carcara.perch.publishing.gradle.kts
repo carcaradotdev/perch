@@ -13,7 +13,6 @@
 // project itself, which is its documented Isolated Projects incompatibility; the base plugin
 // configures nothing until asked, and everything below is that asking.
 apply(plugin = "com.vanniktech.maven.publish.base")
-apply(plugin = "org.jetbrains.kotlinx.binary-compatibility-validator")
 
 // The publishing coordinates belong to the plugin that publishes, not to a list somewhere else of
 // which modules those are. `group` is only ever read for an artifact, so the module that gets it is

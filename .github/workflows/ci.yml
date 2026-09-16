@@ -78,7 +78,7 @@ jobs:
           key: konan-${{ runner.os }}-${{ hashFiles('gradle/libs.versions.toml') }}
           restore-keys: konan-${{ runner.os }}-
 
-      # `build` runs `check`, which is `apiCheck` for both published modules plus detekt over every
+      # `build` runs `check`, which is `apiCheck` for `perch-core` plus detekt over every
       # main source set. It also builds and tests `sample/`, which exercises the KSP processor and
       # the aggregation plugin end to end against the plugins resolved from `perch-gradle-plugin`
       # through `pluginManagement.includeBuild` - so a change to either plugin that breaks the
