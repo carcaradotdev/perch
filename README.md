@@ -430,3 +430,21 @@ rather than a release.
 
 Running them yourself before opening one is still faster than waiting, and needs macOS for the
 same reason.
+
+## License
+
+Apache License 2.0. See [LICENSE](LICENSE).
+
+The resource serialisation in `perch-core` is derived from
+[Ktor](https://github.com/ktorio/ktor)'s `ktor-resources`, also under Apache 2.0.
+[NOTICE](NOTICE) names every derived file and the Ktor source it comes from.
+
+Every source file carries the header, and `scripts/license_header.py` is what puts it there:
+
+```
+python3 scripts/license_header.py check    # names the files that are missing it or stale
+python3 scripts/license_header.py apply    # rewrites them in place
+```
+
+The text is read out of the appendix of `LICENSE` rather than written down in the script, so the
+two cannot disagree, and CI runs `check` on every pull request.
