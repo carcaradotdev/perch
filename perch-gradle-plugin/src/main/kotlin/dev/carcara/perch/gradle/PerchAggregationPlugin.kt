@@ -16,6 +16,7 @@
 
 package dev.carcara.perch.gradle
 
+import dev.carcara.perch.manifest.MANIFEST_FILE_PATTERN
 import org.gradle.api.GradleException
 import org.gradle.api.Plugin
 import org.gradle.api.Project
@@ -121,7 +122,7 @@ public class PerchAggregationPlugin : Plugin<Project> {
       .artifacts
 
     val manifestFiles =
-      manifestArtifacts.artifactFiles.asFileTree.matching { include("perch-manifest-*.txt") }
+      manifestArtifacts.artifactFiles.asFileTree.matching { include(MANIFEST_FILE_PATTERN) }
     // Resolved at execution time, from a provider that holds the artifact collection rather than
     // the project. What `lenient(true)` swallows lands here, and the task reports it.
     val resolutionFailures = project.provider {

@@ -35,7 +35,3 @@ public final class dev/carcara/perch/DeepLinkSerializationException : java/lang/
 	public fun <init> (Ljava/lang/String;)V
 }
 
-public final class dev/carcara/perch/PathPatternKt {
-	public static final fun patternsConflict (Ljava/lang/String;Ljava/lang/String;)Z
-}
-

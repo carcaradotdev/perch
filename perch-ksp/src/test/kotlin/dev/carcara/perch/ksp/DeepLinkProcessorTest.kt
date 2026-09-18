@@ -33,7 +33,11 @@ class DeepLinkProcessorTest {
 
   @get:Rule val workingDir = TemporaryFolder()
 
-  private fun compile(vararg sources: SourceFile, outputPackage: String = "com.acme.home") =
+  private fun compile(
+    vararg sources: SourceFile,
+    outputPackage: String = "com.acme.home",
+    moduleId: String? = null,
+  ) =
     KotlinCompilation().apply {
       this.sources = sources.toList()
       workingDir = this@DeepLinkProcessorTest.workingDir.root
@@ -44,6 +48,7 @@ class DeepLinkProcessorTest {
       configureKsp {
         symbolProcessorProviders += DeepLinkProcessorProvider()
         processorOptions["perch.outputPackage"] = outputPackage
+        moduleId?.let { processorOptions["perch.moduleId"] = it }
       }
     }.compile()
 
@@ -61,6 +66,27 @@ class DeepLinkProcessorTest {
     class PaymentLink(val id: String)
 
     class NotADeepLink
+    """,
+  )
+
+  private val nestedRouteSource = SourceFile.kotlin(
+    "ShopRoutes.kt",
+    """
+    package com.acme.shop
+
+    import dev.carcara.perch.DeepLink
+
+    @DeepLink("/orders")
+    class Orders
+
+    @DeepLink("/{id}")
+    class OrderById(val parent: Orders, val id: String)
+
+    @DeepLink("/users")
+    class Users
+
+    @DeepLink("/{id}")
+    class UserById(val parent: Users, val id: String)
     """,
   )
 
@@ -92,8 +118,8 @@ class DeepLinkProcessorTest {
 
     assertEquals(
       listOf(
-        "/home|com.acme.home.HomeLink|com.acme.home",
-        "/payments/{id}|com.acme.home.PaymentLink|com.acme.home",
+        "home|com.acme.home.HomeLink|com.acme.home",
+        "payments/{id}|com.acme.home.PaymentLink|com.acme.home",
       ),
       lines,
     )
@@ -147,17 +173,64 @@ class DeepLinkProcessorTest {
   }
 
   @Test
-  fun `a blank output package generates nothing`() {
-    val result = compile(routeSource, outputPackage = "")
+  fun `a blank output package publishes a manifest and generates no parser`() {
+    val result = compile(routeSource, outputPackage = "", moduleId = ":features:home")
 
     assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode)
     val generated = File(result.outputDirectory.parentFile, "ksp/sources/kotlin/com/acme/home/DeepLinkRegistration.kt")
     assertTrue(!generated.exists())
+
+    // The manifest is named after the module, not after the package it would have generated into,
+    // which is the only reason a module with no output package has a manifest name at all.
     val manifest = File(
       result.outputDirectory.parentFile,
-      "ksp/sources/resources/perch-manifest-com-acme-home.txt",
+      "ksp/sources/resources/perch-manifest-features-home.txt",
     )
-    assertTrue(!manifest.exists())
+    assertTrue(manifest.exists())
+    assertEquals(
+      listOf(
+        "home|com.acme.home.HomeLink|:features:home",
+        "payments/{id}|com.acme.home.PaymentLink|:features:home",
+      ),
+      manifest.readLines().filter { it.isNotBlank() }.sorted(),
+    )
+  }
+
+  @Test
+  fun `a nested route carries its parent's pattern`() {
+    val result = compile(nestedRouteSource, outputPackage = "com.acme.shop")
+
+    assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode)
+    val manifest = File(
+      result.outputDirectory.parentFile,
+      "ksp/sources/resources/perch-manifest-com-acme-shop.txt",
+    )
+
+    // `orders/{id}`, not the `/{id}` the annotation carries. The parser composes a nested route's
+    // pattern from its parents, so a processor reading only the annotation would check a pattern
+    // that never gets registered.
+    assertEquals(
+      listOf(
+        "orders" to "com.acme.shop.Orders",
+        "orders/{id}" to "com.acme.shop.OrderById",
+        "users" to "com.acme.shop.Users",
+        "users/{id}" to "com.acme.shop.UserById",
+      ).sortedBy { it.second },
+      manifest.readLines()
+        .filter { it.isNotBlank() }
+        .map { it.split('|')[0] to it.split('|')[1] }
+        .sortedBy { it.second },
+    )
+  }
+
+  @Test
+  fun `two nested routes under different parents do not collide`() {
+    // Both are annotated `@DeepLink("/{id}")`. Compared as written they are structurally identical
+    // and the build fails; compared as the parser sees them they are `orders/{id}` and
+    // `users/{id}`, which differ in their first segment.
+    val result = compile(nestedRouteSource, outputPackage = "com.acme.shop")
+
+    assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode)
   }
 
   @Test

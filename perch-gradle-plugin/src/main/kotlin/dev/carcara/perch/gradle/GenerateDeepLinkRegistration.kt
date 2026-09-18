@@ -16,7 +16,11 @@
 
 package dev.carcara.perch.gradle
 
+import dev.carcara.perch.manifest.ManifestRoute
+import dev.carcara.perch.manifest.parseManifestLine
+import dev.carcara.perch.patternsConflict
 import org.gradle.api.DefaultTask
+import org.gradle.api.GradleException
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.provider.ListProperty
@@ -30,9 +34,6 @@ import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
 import java.io.File
-
-/** Field index of the fully qualified route class in a `path|routeClassName|outputPackage` line. */
-private const val ROUTE_CLASS_FIELD = 1
 
 /** Generates `perchParser()` from every route manifest reachable from the applying module. */
 @CacheableTask
@@ -63,26 +64,64 @@ public abstract class GenerateDeepLinkRegistration : DefaultTask() {
     val packageName = outputPackage.get()
 
     val manifestFiles = manifests.files.sortedBy { it.invariantSeparatorsPath }
-    val routes = mutableListOf<String>()
+    val routes = mutableListOf<DiscoveredRoute>()
     val unparseable = mutableListOf<String>()
     manifestFiles.forEach { file -> read(file, routes, unparseable) }
 
-    val registered = routes.distinct().sorted()
+    // By route class, not by line: one module's manifest is reachable through more than one path
+    // in the graph, so the same route arrives more than once and is not a collision with itself.
+    val discovered = routes.distinctBy { it.route.routeClassName }
+    failOnConflict(discovered)
+
+    val registered = discovered.map { it.route.routeClassName }.sorted()
     write(packageName, registered)
     report(manifestFiles, registered, unparseable, packageName)
   }
 
-  private fun read(file: File, routes: MutableList<String>, unparseable: MutableList<String>) {
+  private fun read(file: File, routes: MutableList<DiscoveredRoute>, unparseable: MutableList<String>) {
     file.readLines().forEachIndexed { index, line ->
       if (line.isBlank()) return@forEachIndexed
-      val routeClass = line.split('|').getOrNull(ROUTE_CLASS_FIELD).orEmpty().trim()
-      if (routeClass.isEmpty()) {
+      val route = parseManifestLine(line)
+      if (route == null) {
         unparseable += "${file.name}:${index + 1}: $line"
       } else {
-        routes += routeClass
+        routes += DiscoveredRoute(file, route)
       }
     }
   }
+
+  /**
+   * Fails the build when two routes could match the same URL.
+   *
+   * This is the only place the question can be asked. The processor sees one module at a time and
+   * the parser sees them all, but only at runtime: without this, two feature modules declaring
+   * `/payments/{id}` and `/payments/{code}` build green on every job, and the app throws
+   * `DeepLinkCollisionException` the first time it builds a parser - a launch crash for a mistake
+   * that belongs to whoever added the second route.
+   *
+   * Comparing every pair is quadratic in the number of routes an app declares. At the scale where
+   * that costs anything the task is cached, and it runs once per aggregating module.
+   */
+  private fun failOnConflict(routes: List<DiscoveredRoute>) {
+    for (i in routes.indices) {
+      for (j in i + 1 until routes.size) {
+        val left = routes[i]
+        val right = routes[j]
+        if (!patternsConflict(left.route.pattern, right.route.pattern)) continue
+        throw GradleException(
+          "Deep link collision between modules. '${left.route.routeClassName}' in " +
+            "${left.route.moduleId} declares '${left.route.pattern}', and " +
+            "'${right.route.routeClassName}' in ${right.route.moduleId} declares " +
+            "'${right.route.pattern}'. A URL matching one matches the other, so the parser cannot " +
+            "know which route to return. The manifests are ${left.file.name} and " +
+            "${right.file.name}; change one of the two patterns.",
+        )
+      }
+    }
+  }
+
+  /** A route and the manifest it was read from, which is what a collision message has to name. */
+  private data class DiscoveredRoute(val file: File, val route: ManifestRoute)
 
   private fun write(packageName: String, routes: List<String>) {
     // Only the parser and the logger are imported: they are the ones named in the signature. A
@@ -134,9 +173,9 @@ public abstract class GenerateDeepLinkRegistration : DefaultTask() {
   ) {
     if (unparseable.isNotEmpty()) {
       logger.warn(
-        "Perch: ignored ${unparseable.size} manifest line(s) that carry no route class in field " +
-          "${ROUTE_CLASS_FIELD + 1} of `path|routeClassName|outputPackage`. Any route they meant " +
-          "to declare is missing from $packageName.perchParser():\n" +
+        "Perch: ignored ${unparseable.size} manifest line(s) that are not a " +
+          "`pattern|routeClassName|moduleId` triple. Any route they meant to declare is missing " +
+          "from $packageName.perchParser():\n" +
           unparseable.joinToString("\n") { "  - $it" },
       )
     }

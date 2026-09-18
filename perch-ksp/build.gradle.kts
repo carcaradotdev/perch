@@ -25,20 +25,28 @@ description = "The Perch KSP processor, which turns `@DeepLink` route classes in
 kotlin {
   explicitApi()
   jvmToolchain(21)
+
+  // The path-pattern rules live in `shared/routing` and are compiled into this build from there.
+  // Perch's three Gradle builds cannot depend on one another - the plugins arrive through
+  // `pluginManagement.includeBuild` - and all three have to apply the same rule, so they share the
+  // file rather than a copy of what it says. See the comment at the top of it.
+  sourceSets.named("main") { kotlin.srcDir("../shared/routing") }
+
+  // The manifest format lives in `shared/manifest` and is compiled into this build from there, so
+  // the side that writes a manifest and the side that reads it cannot disagree about its shape.
+  sourceSets.named("main") { kotlin.srcDir("../shared/manifest") }
 }
 
 dependencies {
   implementation(libs.ksp.api)
-  // For `patternsConflict`, so the collision rule the processor enforces at build time is the one
-  // the parser enforces at runtime rather than a copy of it. Core's own dependency list is a
-  // single entry, kotlinx-serialization-core, so this costs the KSP classpath almost nothing.
-  implementation(projects.perchCore)
   testImplementation(libs.junit)
   testImplementation(libs.kctfork.core)
   testImplementation(libs.kctfork.ksp)
   // Only so one test can prove a Ktor `@Resource` class is not mistaken for a deep link. Nothing
   // Perch ships depends on Ktor.
   testImplementation(libs.ktor.resources)
+  // So the processor's tests can check a generated pattern against the one the parser derives.
+  testImplementation(projects.perchCore)
 }
 
 tasks.test { useJUnit() }

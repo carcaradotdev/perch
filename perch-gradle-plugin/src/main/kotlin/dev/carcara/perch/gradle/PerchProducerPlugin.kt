@@ -97,6 +97,9 @@ public class PerchProducerPlugin : Plugin<Project> {
           ?: throw GradleException("dev.carcara.perch: set `perch.outputPackage` in $projectPath")
       }
       ksp.arg("perch.outputPackage", outputPackage)
+      // Manifests are named after the declaring module rather than after the package it generates
+      // into, so two modules sharing an output package still publish two distinguishable files.
+      ksp.arg("perch.moduleId", projectPath)
     }
 
     project.plugins.withId(KOTLIN_MULTIPLATFORM_ID) { compileGeneratedRegistration(project) }

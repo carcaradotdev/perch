@@ -25,6 +25,12 @@ import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSAnnotation
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSFile
+import com.google.devtools.ksp.symbol.KSPropertyDeclaration
+import dev.carcara.perch.joinDeepLinkPattern
+import dev.carcara.perch.manifest.MANIFEST_FILE_EXTENSION
+import dev.carcara.perch.manifest.ManifestRoute
+import dev.carcara.perch.manifest.manifestFileNameFor
+import dev.carcara.perch.manifest.renderManifestLine
 import dev.carcara.perch.patternsConflict
 import java.io.OutputStreamWriter
 
@@ -54,8 +60,11 @@ internal class DeepLinkProcessor(
     if (processed) return emptyList()
     processed = true
 
-    val outputPackage = options["perch.outputPackage"]
-    if (outputPackage.isNullOrBlank()) return emptyList()
+    val outputPackage = options["perch.outputPackage"].orEmpty()
+    // The declaring module's Gradle path, which the producer plugin passes and manifests are named
+    // after. A processor run by hand has no plugin to pass it, so the output package stands in.
+    val moduleId = options["perch.moduleId"]?.takeIf { it.isNotBlank() }
+      ?: outputPackage.ifBlank { "root" }
 
     val routeClasses = mutableSetOf<KSClassDeclaration>()
     resolver.getAllFiles().forEach { file ->
@@ -66,7 +75,18 @@ internal class DeepLinkProcessor(
 
     if (routeClasses.isEmpty()) return emptyList()
 
-    generateRegistrationFile(outputPackage, routeClasses.toList())
+    val routes = manifestRoutes(moduleId, routeClasses.toList()) ?: return emptyList()
+    if (routes.isEmpty()) return emptyList()
+
+    val routeSources = routeClasses.mapNotNull { it.containingFile }.distinct().toTypedArray()
+    generateManifestFile(moduleId, routes, routeSources)
+
+    // A blank output package is how a module says it contributes its routes to an aggregator
+    // without wanting a parser of its own. Its manifest is written above either way, which is what
+    // `PerchExtension.outputPackage` promises and what makes the setting about codegen alone.
+    if (outputPackage.isNotBlank()) {
+      generateRegistrationFile(outputPackage, routes, routeSources)
+    }
 
     return emptyList()
   }
@@ -112,32 +132,85 @@ internal class DeepLinkProcessor(
    * green, red. Repeated `./gradlew build` runs over `sample/` are what catches this; nothing in
    * the compile-testing suite reaches KSP's incremental machinery.
    */
-  private fun generateRegistrationFile(packageName: String, routeClasses: List<KSClassDeclaration>) {
-    val routeSources = routeClasses.mapNotNull { it.containingFile }.distinct().toTypedArray()
-    val routeInfoList = mutableListOf<RouteInfo>()
+  /**
+   * One [ManifestRoute] per route in [routeClasses], or null once an error has been logged.
+   *
+   * Reporting through the logger, rather than throwing, is what fails the KSP round with a
+   * COMPILATION_ERROR instead of an uncaught-exception INTERNAL_ERROR: KSP fails the build once any
+   * error is logged, without needing the round to unwind via an exception.
+   */
+  private fun manifestRoutes(
+    moduleId: String,
+    routeClasses: List<KSClassDeclaration>,
+  ): List<ManifestRoute>? {
+    val routes = mutableListOf<ManifestRoute>()
 
     routeClasses.forEach { classDecl ->
-      val path = deepLinkPath(classDecl) ?: return@forEach
+      val pattern = composedPattern(classDecl) ?: return@forEach
       val routeName = classDecl.qualifiedName?.asString() ?: return@forEach
 
-      for ((existingPath, existingRoute) in routeInfoList) {
-        if (patternsConflict(path, existingPath)) {
-          // Reporting through the logger, rather than throwing, is what fails the KSP round with
-          // a COMPILATION_ERROR instead of an uncaught-exception INTERNAL_ERROR: KSP fails the
-          // build once any error is logged, without needing the round to unwind via an exception.
-          logger.error(
-            "Deep link collision detected. Pattern '$path' conflicts with '$existingPath', " +
-              "already registered by '$existingRoute', so '$routeName' cannot be registered.",
-            classDecl,
-          )
-          return
-        }
+      val clash = routes.firstOrNull { patternsConflict(pattern, it.pattern) }
+      if (clash != null) {
+        logger.error(
+          "Deep link collision detected. Pattern '$pattern' conflicts with '${clash.pattern}', " +
+            "already registered by '${clash.routeClassName}', so '$routeName' cannot be registered.",
+          classDecl,
+        )
+        return null
       }
-      routeInfoList.add(RouteInfo(path, routeName))
+      routes += ManifestRoute(pattern = pattern, routeClassName = routeName, moduleId = moduleId)
     }
 
-    generateManifestFile(packageName, routeInfoList, routeSources)
+    return routes
+  }
 
+  /**
+   * The full path pattern of [classDecl], its parents' patterns included.
+   *
+   * A nested route's pattern is its own `@DeepLink` path appended to its parent's: the parser
+   * derives it that way from the serial descriptor, and a processor that read only the annotation
+   * would check a pattern the parser never registers. Two sibling routes each annotated `/{id}`
+   * under different parents would then fail the build for a collision that does not exist, and a
+   * nested `/orders/{id}` that genuinely does collide with a top-level one would pass.
+   *
+   * The parent is the property whose own type is a route, and there is at most one: a route
+   * reached by two different paths would have two patterns and no way to choose between them.
+   */
+  private fun composedPattern(classDecl: KSClassDeclaration): String? {
+    val segments = mutableListOf<String>()
+    val visited = mutableSetOf<String>()
+
+    var current: KSClassDeclaration? = classDecl
+    while (current != null) {
+      val declaration = current
+      val name = declaration.qualifiedName?.asString() ?: return null
+      if (!visited.add(name)) {
+        logger.error("Deep link route '$name' is reachable from itself through its parents.", classDecl)
+        return null
+      }
+      segments += deepLinkPath(declaration) ?: return null
+
+      val parents = declaration.getAllProperties().filter(::isRoute).toList()
+      if (parents.size > 1) {
+        logger.error("There are multiple parents for deep link '$name'.", classDecl)
+        return null
+      }
+      current = parents.firstOrNull()?.type?.resolve()?.declaration as? KSClassDeclaration
+    }
+
+    return joinDeepLinkPattern(segments)
+  }
+
+  private fun isRoute(property: KSPropertyDeclaration): Boolean {
+    val declaration = property.type.resolve().declaration as? KSClassDeclaration ?: return false
+    return deepLinkAnnotation(declaration) != null
+  }
+
+  private fun generateRegistrationFile(
+    packageName: String,
+    routes: List<ManifestRoute>,
+    routeSources: Array<KSFile>,
+  ) {
     val file = codeGenerator.createNewFile(
       dependencies = Dependencies(aggregating = true, *routeSources),
       packageName = packageName,
@@ -166,46 +239,36 @@ internal class DeepLinkProcessor(
       writer.write("  hosts: Set<String> = emptySet(),\n")
       writer.write("  logger: $loggerSimpleName = $loggerSimpleName.None,\n")
       writer.write("): $parserSimpleName = $parserSimpleName(schemes, hosts, logger).apply {\n")
-      // routeInfoList, not routeClasses: a class whose @DeepLink path could not be read was
-      // skipped above and has no manifest entry, so registering it here would emit a
-      // register<T>() the manifest does not know about.
-      routeInfoList.sortedBy { it.routeClassName }.forEach { route ->
+      // The manifest's own routes: a class whose @DeepLink path could not be read was skipped
+      // when they were collected, so registering it here would emit a register<T>() no manifest
+      // knows about.
+      routes.sortedBy { it.routeClassName }.forEach { route ->
         writer.write("  register<${route.routeClassName}>()\n")
       }
       writer.write("}\n")
     }
 
-    logger.info("DeepLinkProcessor: generated perchModuleParser() with ${routeInfoList.size} routes in $packageName")
+    logger.info("DeepLinkProcessor: generated perchModuleParser() with ${routes.size} routes in $packageName")
   }
 
   private fun generateManifestFile(
-    packageName: String,
-    routes: List<RouteInfo>,
+    moduleId: String,
+    routes: List<ManifestRoute>,
     routeSources: Array<KSFile>,
   ) {
-    if (routes.isEmpty()) return
-
-    // Format: path|routeClassName|outputPackage
     val manifestFile = codeGenerator.createNewFile(
       dependencies = Dependencies(aggregating = true, *routeSources),
       packageName = "",
-      fileName = "perch-manifest-${packageName.replace(".", "-")}",
-      extensionName = "txt",
+      fileName = manifestFileNameFor(moduleId),
+      extensionName = MANIFEST_FILE_EXTENSION,
     )
 
     OutputStreamWriter(manifestFile).use { writer ->
-      routes.forEach { route ->
-        writer.write("${route.path}|${route.routeClassName}|$packageName\n")
-      }
+      routes.forEach { route -> writer.write(renderManifestLine(route) + "\n") }
     }
 
-    logger.info("DeepLinkProcessor: generated manifest with ${routes.size} routes for $packageName")
+    logger.info("DeepLinkProcessor: generated manifest with ${routes.size} routes for $moduleId")
   }
-
-  private data class RouteInfo(
-    val path: String,
-    val routeClassName: String,
-  )
 
   /** The @DeepLink annotation has a single "path" argument. */
   private fun deepLinkPath(classDecl: KSClassDeclaration): String? =
