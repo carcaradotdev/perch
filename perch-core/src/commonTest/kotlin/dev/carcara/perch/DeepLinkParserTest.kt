@@ -19,6 +19,7 @@ package dev.carcara.perch
 import kotlinx.serialization.Serializable
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -369,13 +370,7 @@ class DeepLinkParserTest {
     val subject = parser()
     subject.register<FeatureListNoSlash>()
 
-    var collisionDetected = false
-    try {
-      subject.register<FeatureListWithSlash>()
-    } catch (expected: DeepLinkCollisionException) {
-      collisionDetected = true
-    }
-    assertTrue(collisionDetected, "Expected collision between /feature/list and /feature/list/")
+    assertFailsWith<DeepLinkCollisionException> { subject.register<FeatureListWithSlash>() }
   }
 
   @Test
@@ -384,13 +379,7 @@ class DeepLinkParserTest {
     subject.register<FeatureListNoSlash>() // /feature/list
 
     // /feature/{id} conflicts because "list" could be matched by {id}.
-    var collisionDetected = false
-    try {
-      subject.register<FeatureByIdDeepLink>()
-    } catch (expected: DeepLinkCollisionException) {
-      collisionDetected = true
-    }
-    assertTrue(collisionDetected, "Expected collision between /feature/list and /feature/{id}")
+    assertFailsWith<DeepLinkCollisionException> { subject.register<FeatureByIdDeepLink>() }
   }
 
   @Test
@@ -399,13 +388,7 @@ class DeepLinkParserTest {
     subject.register<FeatureByIdDeepLink>() // /feature/{id}
 
     // /feature/{name} conflicts because the two are structurally identical.
-    var collisionDetected = false
-    try {
-      subject.register<FeatureByNameDeepLink>()
-    } catch (expected: DeepLinkCollisionException) {
-      collisionDetected = true
-    }
-    assertTrue(collisionDetected, "Expected collision between /feature/{id} and /feature/{name}")
+    assertFailsWith<DeepLinkCollisionException> { subject.register<FeatureByNameDeepLink>() }
   }
 
   @Test

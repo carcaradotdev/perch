@@ -149,7 +149,7 @@ public class PerchProducerPlugin : Plugin<Project> {
 
     project.extensions.getByType(KotlinMultiplatformExtension::class.java)
       .sourceSets
-      .configureEach { if (name == "commonMain") kotlin.srcDir(generatedSources) }
+      .named("commonMain") { kotlin.srcDir(generatedSources) }
 
     project.tasks.withType(KotlinCompilationTask::class.java).configureEach {
       if (name != KSP_METADATA_TASK) dependsOn(KSP_METADATA_TASK)

@@ -22,8 +22,10 @@ import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.symbol.KSAnnotated
+import com.google.devtools.ksp.symbol.KSAnnotation
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSFile
+import dev.carcara.perch.patternsConflict
 import java.io.OutputStreamWriter
 
 /**
@@ -41,6 +43,7 @@ internal class DeepLinkProcessor(
 
   private companion object {
     private const val DEEP_LINK_ANNOTATION = "dev.carcara.perch.DeepLink"
+    private val DEEP_LINK_SHORT_NAME = DEEP_LINK_ANNOTATION.substringAfterLast('.')
     private const val PARSER_CLASS = "dev.carcara.perch.DeepLinkParser"
     private const val LOGGER_CLASS = "dev.carcara.perch.DeepLinkLogger"
   }
@@ -72,7 +75,7 @@ internal class DeepLinkProcessor(
     classDecl: KSClassDeclaration,
     result: MutableSet<KSClassDeclaration>,
   ) {
-    if (hasDeepLinkAnnotation(classDecl)) {
+    if (deepLinkAnnotation(classDecl) != null) {
       result.add(classDecl)
     }
 
@@ -83,9 +86,19 @@ internal class DeepLinkProcessor(
       }
   }
 
-  private fun hasDeepLinkAnnotation(classDecl: KSClassDeclaration): Boolean = classDecl.annotations.any { annotation ->
-    annotation.annotationType.resolve().declaration.qualifiedName?.asString() == DEEP_LINK_ANNOTATION
-  }
+  /**
+   * The `@DeepLink` on [classDecl], or null when it carries none.
+   *
+   * Matching the short name first is what keeps this cheap. Resolving an annotation's type is a
+   * KSP type-resolution, and every class in the module arrives here with its full annotation list -
+   * `@Serializable`, `@Inject`, `@Composable` and the rest - so resolving each one only to reject
+   * it is the most-repeated work in the processor. The short name settles almost all of them.
+   */
+  private fun deepLinkAnnotation(classDecl: KSClassDeclaration): KSAnnotation? =
+    classDecl.annotations.find { annotation ->
+      annotation.shortName.asString() == DEEP_LINK_SHORT_NAME &&
+        annotation.annotationType.resolve().declaration.qualifiedName?.asString() == DEEP_LINK_ANNOTATION
+    }
 
   /**
    * Both generated files declare the route sources they were built from, and declare themselves
@@ -102,13 +115,12 @@ internal class DeepLinkProcessor(
   private fun generateRegistrationFile(packageName: String, routeClasses: List<KSClassDeclaration>) {
     val routeSources = routeClasses.mapNotNull { it.containingFile }.distinct().toTypedArray()
     val routeInfoList = mutableListOf<RouteInfo>()
-    val registeredRoutes = mutableListOf<Pair<String, String>>()
 
     routeClasses.forEach { classDecl ->
       val path = deepLinkPath(classDecl) ?: return@forEach
       val routeName = classDecl.qualifiedName?.asString() ?: return@forEach
 
-      for ((existingPath, existingRoute) in registeredRoutes) {
+      for ((existingPath, existingRoute) in routeInfoList) {
         if (patternsConflict(path, existingPath)) {
           // Reporting through the logger, rather than throwing, is what fails the KSP round with
           // a COMPILATION_ERROR instead of an uncaught-exception INTERNAL_ERROR: KSP fails the
@@ -121,8 +133,7 @@ internal class DeepLinkProcessor(
           return
         }
       }
-      registeredRoutes.add(path to routeName)
-      routeInfoList.add(RouteInfo(path, routeName, packageName))
+      routeInfoList.add(RouteInfo(path, routeName))
     }
 
     generateManifestFile(packageName, routeInfoList, routeSources)
@@ -174,7 +185,7 @@ internal class DeepLinkProcessor(
   ) {
     if (routes.isEmpty()) return
 
-    // Format: path|routeClassName|moduleName
+    // Format: path|routeClassName|outputPackage
     val manifestFile = codeGenerator.createNewFile(
       dependencies = Dependencies(aggregating = true, *routeSources),
       packageName = "",
@@ -184,7 +195,7 @@ internal class DeepLinkProcessor(
 
     OutputStreamWriter(manifestFile).use { writer ->
       routes.forEach { route ->
-        writer.write("${route.path}|${route.routeClassName}|${route.moduleName}\n")
+        writer.write("${route.path}|${route.routeClassName}|$packageName\n")
       }
     }
 
@@ -194,16 +205,9 @@ internal class DeepLinkProcessor(
   private data class RouteInfo(
     val path: String,
     val routeClassName: String,
-    val moduleName: String,
   )
 
-  private fun deepLinkPath(classDecl: KSClassDeclaration): String? {
-    val deepLinkAnnotation = classDecl.annotations.find { annotation ->
-      annotation.annotationType.resolve().declaration.qualifiedName?.asString() == DEEP_LINK_ANNOTATION
-    } ?: return null
-
-    // The @DeepLink annotation has a single "path" argument.
-    val pathArg = deepLinkAnnotation.arguments.firstOrNull()
-    return pathArg?.value as? String
-  }
+  /** The @DeepLink annotation has a single "path" argument. */
+  private fun deepLinkPath(classDecl: KSClassDeclaration): String? =
+    deepLinkAnnotation(classDecl)?.arguments?.firstOrNull()?.value as? String
 }

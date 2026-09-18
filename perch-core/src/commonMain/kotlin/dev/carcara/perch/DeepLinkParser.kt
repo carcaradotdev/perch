@@ -107,7 +107,6 @@ public class DeepLinkParser(
   private val format = DeepLinkFormat()
 
   private val registeredRoutes = mutableListOf<RegisteredRoute<*>>()
-  private val registeredPatterns = mutableMapOf<String, String>()
   private var warnedEmpty = false
 
   /** Registers [T] so [parse] can return it. Registering the same route twice is a no-op. */
@@ -127,28 +126,26 @@ public class DeepLinkParser(
       logger.error("Skipping deep link route '$routeName' with no @DeepLink path pattern", error)
       return
     }
-    val normalizedPattern = pathPattern.trimEnd('/')
 
-    for ((existingPattern, existingRoute) in registeredPatterns) {
-      if (existingRoute == routeName) return
-      if (patternsConflict(normalizedPattern, existingPattern.trimEnd('/'))) {
+    for (existing in registeredRoutes) {
+      if (existing.routeName == routeName) return
+      if (patternsConflict(pathPattern, existing.pattern)) {
         throw DeepLinkCollisionException(
           pattern = pathPattern,
-          existingRoute = existingRoute,
+          existingRoute = existing.routeName,
           newRoute = routeName,
         )
       }
     }
 
-    registeredPatterns[pathPattern] = routeName
-    registeredRoutes.add(RegisteredRoute(serializer, pathPattern, format))
+    registeredRoutes.add(RegisteredRoute(serializer, routeName, pathPattern, format))
   }
 
   public fun parse(url: String): Any? {
     warnIfEmpty()
     val location = UrlLocation.of(url) ?: return null
     if (location.scheme != null && location.scheme !in schemes) return null
-    if (location.host != null && hosts.isNotEmpty() && location.host !in hosts) return null
+    if (location.host != null && location.host !in hosts) return null
 
     for (route in registeredRoutes) {
       val result = route.tryParse(location.pathSegments, location.queryParameters)

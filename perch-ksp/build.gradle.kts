@@ -29,13 +29,16 @@ kotlin {
 
 dependencies {
   implementation(libs.ksp.api)
+  // For `patternsConflict`, so the collision rule the processor enforces at build time is the one
+  // the parser enforces at runtime rather than a copy of it. Core's own dependency list is a
+  // single entry, kotlinx-serialization-core, so this costs the KSP classpath almost nothing.
+  implementation(projects.perchCore)
   testImplementation(libs.junit)
   testImplementation(libs.kctfork.core)
   testImplementation(libs.kctfork.ksp)
   // Only so one test can prove a Ktor `@Resource` class is not mistaken for a deep link. Nothing
   // Perch ships depends on Ktor.
   testImplementation(libs.ktor.resources)
-  testImplementation(projects.perchCore)
 }
 
 tasks.test { useJUnit() }

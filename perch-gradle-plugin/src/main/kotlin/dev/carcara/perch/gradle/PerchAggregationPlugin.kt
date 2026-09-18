@@ -137,11 +137,10 @@ public class PerchAggregationPlugin : Plugin<Project> {
       this.resolutionFailures.set(resolutionFailures)
     }
 
-    val kmp = project.extensions.getByType(KotlinMultiplatformExtension::class.java)
-    kmp.sourceSets.configureEach {
-      // Handing the TaskProvider to srcDir makes every consumer of commonMain sources depend on
-      // generation implicitly, so no consumer has to remember to wire the task up.
-      if (name == "commonMain") kotlin.srcDir(generate)
-    }
+    // Handing the TaskProvider to srcDir makes every consumer of commonMain sources depend on
+    // generation implicitly, so no consumer has to remember to wire the task up.
+    project.extensions.getByType(KotlinMultiplatformExtension::class.java)
+      .sourceSets
+      .named("commonMain") { kotlin.srcDir(generate) }
   }
 }

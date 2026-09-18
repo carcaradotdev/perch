@@ -194,25 +194,4 @@ class DeepLinkProcessorTest {
     assertTrue(text.contains("register<com.acme.a.Details>()"))
     assertTrue(text.contains("register<com.acme.b.Details>()"))
   }
-
-  @Test
-  fun `the processor pattern check agrees with the core one`() {
-    val cases = listOf(
-      "/a/b" to "/a/b/",
-      "/a/list" to "/a/{id}",
-      "/a/{id}" to "/a/{name}",
-      "/a/list" to "/a/details",
-      "/a/list" to "/a/list/details",
-      "/a/{rest...}" to "/a/b/c",
-      "/a" to "/a/{opt?}",
-    )
-
-    cases.forEach { (left, right) ->
-      assertEquals(
-        "disagreement on '$left' vs '$right'",
-        dev.carcara.perch.patternsConflict(left, right),
-        patternsConflict(left, right),
-      )
-    }
-  }
 }
