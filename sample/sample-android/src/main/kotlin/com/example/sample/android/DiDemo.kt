@@ -28,6 +28,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -64,11 +65,11 @@ fun DiDemo(app: DemoApp, url: String) {
   // Back pops the router's stack before the shell's own handler gets to close the demo.
   BackHandler { app.back() }
 
-  NavDisplay(
-    backStack = app.backStack,
-    modifier = Modifier.fillMaxSize(),
-    onBack = { app.back() },
-    entryProvider = entryProvider<NavKey> {
+  // Remembered rather than written inline: `entryProvider { }` rebuilds the whole entry map on
+  // every recomposition otherwise, and hands NavDisplay a new lambda each time, which is one it
+  // can never skip.
+  val entries = remember(app) {
+    entryProvider<NavKey> {
       entry<HomeDeepLink> {
         Destino("Home", "The link resolved here.", app)
       }
@@ -78,7 +79,14 @@ fun DiDemo(app: DemoApp, url: String) {
       entry<PaymentRoutes.Details> { key ->
         Destino("Payment", "id = ${key.id}", app)
       }
-    },
+    }
+  }
+
+  NavDisplay(
+    backStack = app.backStack,
+    modifier = Modifier.fillMaxSize(),
+    onBack = { app.back() },
+    entryProvider = entries,
   )
 }
 

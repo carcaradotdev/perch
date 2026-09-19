@@ -24,6 +24,7 @@ package dev.carcara.perch.serialization
 
 import dev.carcara.perch.DeepLink
 import dev.carcara.perch.DeepLinkSerializationException
+import dev.carcara.perch.joinDeepLinkPattern
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialFormat
@@ -49,35 +50,30 @@ internal class DeepLinkFormat(
    * when it declares more than one property whose type is itself a route.
    */
   fun <T> encodeToPathPattern(serializer: KSerializer<T>): String {
-    val path = StringBuilder()
+    val segments = mutableListOf<String>()
 
     var current: SerialDescriptor? = serializer.descriptor
     while (current != null) {
-      val segment = current.annotations.filterIsInstance<DeepLink>().firstOrNull()?.path
+      val descriptor = current
+      segments += descriptor.annotations.filterIsInstance<DeepLink>().firstOrNull()?.path
         ?: throw DeepLinkSerializationException(
-          "${current.serialName} is not annotated @DeepLink, so it has no path pattern",
+          "${descriptor.serialName} is not annotated @DeepLink, so it has no path pattern",
         )
-      val needsSlash = path.isNotEmpty() && !path.startsWith('/') && !segment.endsWith('/')
-      if (needsSlash) {
-        path.insert(0, '/')
-      }
-      path.insert(0, segment)
 
-      val parents = current.elementDescriptors.filter { element ->
+      // A property whose own type is a route is this route's parent. There is at most one: a route
+      // reached by two different paths would have two patterns and no way to choose between them.
+      val parents = descriptor.elementDescriptors.filter { element ->
         element.annotations.any { it is DeepLink }
       }
       if (parents.size > 1) {
         throw DeepLinkSerializationException(
-          "There are multiple parents for deep link ${current.serialName}",
+          "There are multiple parents for deep link ${descriptor.serialName}",
         )
       }
       current = parents.firstOrNull()
     }
 
-    if (path.startsWith('/')) {
-      path.deleteAt(0)
-    }
-    return path.toString()
+    return joinDeepLinkPattern(segments)
   }
 
   fun <T> encodeToParameters(serializer: KSerializer<T>, value: T): DeepLinkParameters {

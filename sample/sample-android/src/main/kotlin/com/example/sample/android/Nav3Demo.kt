@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
@@ -48,11 +49,11 @@ fun Nav3Demo(route: Any?) {
     else -> rememberNavBackStack(HomeDeepLink, deepLinked)
   }
 
-  NavDisplay(
-    backStack = backStack,
-    modifier = Modifier.fillMaxSize(),
-    onBack = { backStack.removeLastOrNull() },
-    entryProvider = entryProvider<NavKey> {
+  // Remembered rather than written inline: `entryProvider { }` rebuilds the whole entry map on
+  // every recomposition otherwise, and hands NavDisplay a new lambda each time, which is one it
+  // can never skip.
+  val entries = remember(backStack) {
+    entryProvider<NavKey> {
       entry<HomeDeepLink> {
         DestinationBody(
           screen = "Home",
@@ -78,6 +79,13 @@ fun Nav3Demo(route: Any?) {
           note = "The NavEntry key here is the very object parse() returned. Back pops it.",
         )
       }
-    },
+    }
+  }
+
+  NavDisplay(
+    backStack = backStack,
+    modifier = Modifier.fillMaxSize(),
+    onBack = { backStack.removeLastOrNull() },
+    entryProvider = entries,
   )
 }

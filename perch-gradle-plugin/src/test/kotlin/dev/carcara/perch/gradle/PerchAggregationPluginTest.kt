@@ -230,6 +230,25 @@ class PerchAggregationPluginTest {
   }
 
   @Test
+  fun `fails naming both routes when two modules declare conflicting patterns`() {
+    // The check no other layer can make. The processor sees one module at a time, so neither of
+    // these fails its own build; the parser sees both, but only once the app is running.
+    fixture("alpha", "beta", "app")
+    producer("alpha", "payments/{id}|com.acme.alpha.PaymentLink|:alpha")
+    producer("beta", "payments/{code}|com.acme.beta.PaymentLink|:beta")
+    consumer(implementation("alpha"), implementation("beta"))
+
+    val result = runner(":app:generateDeepLinkRegistration").buildAndFail()
+
+    assertTrue(result.output, result.output.contains("Deep link collision between modules"))
+    assertTrue(result.output, result.output.contains("com.acme.alpha.PaymentLink"))
+    assertTrue(result.output, result.output.contains("com.acme.beta.PaymentLink"))
+    assertTrue(result.output, result.output.contains(":alpha"))
+    assertTrue(result.output, result.output.contains(":beta"))
+    assertTrue(result.output, result.output.contains("perch-manifest-alpha.txt"))
+  }
+
+  @Test
   fun `a dependency with no manifest variant does not fail the build`() {
     fixture("plain", "app")
     file(

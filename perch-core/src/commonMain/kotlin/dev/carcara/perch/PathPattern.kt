@@ -22,92 +22,6 @@ import dev.carcara.perch.serialization.percentDecode
 import kotlinx.serialization.KSerializer
 
 /**
- * Reports whether two path patterns could match the same URL, which is what [DeepLinkParser]
- * treats as a registration collision.
- *
- * Conflicts:
- * - `/feature/list` against `/feature/list/`, which differ only by a trailing slash
- * - `/feature/list` against `/feature/{id}`, where the parameter also matches the constant
- * - `/feature/{id}` against `/feature/{name}`, which are structurally identical
- *
- * Non-conflicts:
- * - `/feature/list` against `/feature/details`, two different constants
- * - `/feature/list` against `/feature/list/details`, a different segment count
- *
- * Public because `perch-ksp` carries a second implementation of this rule — the processor is
- * JVM-only and cannot depend on a multiplatform artefact — and its tests assert the two agree.
- */
-public fun patternsConflict(pattern1: String, pattern2: String): Boolean {
-  val segments1 = pattern1.split("/").filter { it.isNotEmpty() }
-  val segments2 = pattern2.split("/").filter { it.isNotEmpty() }
-
-  if (segments1.size != segments2.size) {
-    return couldMatchWithOptionals(segments1, segments2)
-  }
-
-  for (i in segments1.indices) {
-    val seg1 = segments1[i]
-    val seg2 = segments2[i]
-
-    val seg1IsParam = seg1.startsWith("{") && seg1.endsWith("}")
-    val seg2IsParam = seg2.startsWith("{") && seg2.endsWith("}")
-
-    // Two constants conflict only when they are the same word. Any pairing that involves a
-    // parameter conflicts, because the parameter matches whatever sits opposite it.
-    if (!seg1IsParam && !seg2IsParam && seg1 != seg2) return false
-  }
-
-  return true
-}
-
-/**
- * Reports whether patterns of different segment counts could still conflict, which happens when
- * the shorter one ends in a tailcard or the longer one's extra segments are all optional.
- */
-internal fun couldMatchWithOptionals(segments1: List<String>, segments2: List<String>): Boolean {
-  val shorter = if (segments1.size < segments2.size) segments1 else segments2
-  val longer = if (segments1.size < segments2.size) segments2 else segments1
-
-  if (shorter.isNotEmpty()) {
-    val lastSeg = shorter.last()
-    if (lastSeg.startsWith("{") && lastSeg.endsWith("...}")) {
-      // A tailcard matches any number of remaining segments.
-      for (i in 0 until shorter.size - 1) {
-        val seg1 = shorter[i]
-        val seg2 = longer.getOrNull(i) ?: return false
-        if (!segmentsCouldMatch(seg1, seg2)) return false
-      }
-      return true
-    }
-  }
-
-  if (shorter.size < longer.size) {
-    for (i in shorter.indices) {
-      if (!segmentsCouldMatch(shorter[i], longer[i])) return false
-    }
-    for (i in shorter.size until longer.size) {
-      val seg = longer[i]
-      val isOptional = seg.startsWith("{") && seg.endsWith("?}")
-      if (!isOptional) return false
-    }
-    return true
-  }
-
-  return false
-}
-
-/** Reports whether two single segments could match the same URL segment. */
-internal fun segmentsCouldMatch(seg1: String, seg2: String): Boolean {
-  val seg1IsParam = seg1.startsWith("{")
-  val seg2IsParam = seg2.startsWith("{")
-
-  return when {
-    !seg1IsParam && !seg2IsParam -> seg1 == seg2
-    else -> true
-  }
-}
-
-/**
  * Pattern segment types, mirroring Ktor Server's `RouteSelector` hierarchy:
  * - [Constant] matches a literal path segment
  * - [Parameter] matches and captures a required path parameter, `{name}`
@@ -190,10 +104,11 @@ internal sealed class PathSegment {
 /** One registered route: its serialiser, its compiled path pattern, and the format to decode with. */
 internal class RegisteredRoute<T : Any>(
   private val serializer: KSerializer<T>,
-  pathPattern: String,
+  val routeName: String,
+  val pattern: String,
   private val format: DeepLinkFormat,
 ) {
-  private val segments: List<PathSegment> = pathPattern
+  private val segments: List<PathSegment> = pattern
     .split("/")
     .filter { it.isNotEmpty() }
     .map { PathSegment.parse(it) }

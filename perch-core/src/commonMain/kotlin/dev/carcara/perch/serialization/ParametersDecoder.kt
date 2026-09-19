@@ -39,7 +39,7 @@ internal class ParametersDecoder(
   override val serializersModule: SerializersModule,
   private val parameters: DeepLinkParameters,
   elementNames: Iterable<String>,
-) : AbstractDecoder() {
+) : StringBackedDecoder() {
 
   private val parameterNames = elementNames.iterator()
   private lateinit var currentName: String
@@ -68,31 +68,10 @@ internal class ParametersDecoder(
     return ParametersDecoder(serializersModule, parameters, descriptor.elementNames)
   }
 
-  override fun decodeBoolean(): Boolean = decodeString().toBoolean()
-
-  override fun decodeByte(): Byte = decodeString().toByte()
-
-  override fun decodeChar(): Char = decodeString().first()
-
-  override fun decodeDouble(): Double = decodeString().toDouble()
-
-  override fun decodeFloat(): Float = decodeString().toFloat()
-
-  override fun decodeInt(): Int = decodeString().toInt()
-
-  override fun decodeLong(): Long = decodeString().toLong()
-
-  override fun decodeShort(): Short = decodeString().toShort()
-
   override fun decodeString(): String = parameters[currentName]
     ?: throw DeepLinkSerializationException("No value for parameter '$currentName'")
 
   override fun decodeNotNullMark(): Boolean = parameters.contains(currentName)
-
-  override fun decodeNull(): Nothing? = null
-
-  override fun decodeEnum(enumDescriptor: SerialDescriptor): Int =
-    enumIndexOf(enumDescriptor, decodeString())
 }
 
 /** Decodes the repeated values of one name into a list, for a tailcard or a repeated parameter. */
@@ -101,7 +80,7 @@ private class ListLikeDecoder(
   override val serializersModule: SerializersModule,
   private val parameters: DeepLinkParameters,
   private val parameterName: String,
-) : AbstractDecoder() {
+) : StringBackedDecoder() {
 
   private var currentIndex = -1
 
@@ -114,6 +93,21 @@ private class ListLikeDecoder(
     return currentIndex
   }
 
+  override fun decodeString(): String = elements[currentIndex]
+
+  override fun decodeNotNullMark(): Boolean = parameters.contains(parameterName)
+}
+
+/**
+ * What both decoders above have in common: a route parameter arrives as text, so every primitive
+ * and every enum is that text reinterpreted. Only where the text comes from differs, which is why
+ * [decodeString] is the one thing a subclass has to answer.
+ */
+@OptIn(ExperimentalSerializationApi::class)
+internal abstract class StringBackedDecoder : AbstractDecoder() {
+
+  abstract override fun decodeString(): String
+
   override fun decodeBoolean(): Boolean = decodeString().toBoolean()
 
   override fun decodeByte(): Byte = decodeString().toByte()
@@ -129,10 +123,6 @@ private class ListLikeDecoder(
   override fun decodeLong(): Long = decodeString().toLong()
 
   override fun decodeShort(): Short = decodeString().toShort()
-
-  override fun decodeString(): String = elements[currentIndex]
-
-  override fun decodeNotNullMark(): Boolean = parameters.contains(parameterName)
 
   override fun decodeNull(): Nothing? = null
 

@@ -58,11 +58,6 @@ EXCLUDED_FILES = {
     "gradle/wrapper/gradle-wrapper.properties",
 }
 
-# Nothing is vendored verbatim from a third party. The Ktor-derived sources are
-# modified work under the same license and carry the header like anything else;
-# what they additionally keep is the attribution comment NOTICE points at.
-EXCLUDED_PREFIXES: tuple[str, ...] = ()
-
 
 def repository_root() -> Path:
     out = subprocess.run(
@@ -194,7 +189,6 @@ def source_files(root: Path) -> list[str]:
         for path in paths
         if Path(path).suffix in BLOCK_COMMENT | HASH_COMMENT
         and path not in EXCLUDED_FILES
-        and not (EXCLUDED_PREFIXES and path.startswith(EXCLUDED_PREFIXES))
     )
 
 

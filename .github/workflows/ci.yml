@@ -62,18 +62,19 @@ jobs:
       - name: Build the convention plugins
         run: ./gradlew -p build-logic build
 
+      # `publishToMavenLocal` alongside `build` rather than after it, in one invocation: the task
+      # sets differ, so a second `gradlew` is a second configuration-cache entry and a full
+      # re-configuration of the build for the same checks. It is a rehearsal of half the release,
+      # and the only thing that proves the POM, the sources jar and the javadoc jar Maven Central
+      # insists on are all still produced - a break there is otherwise invisible until a release is
+      # already running.
+      #
       # `--no-configuration-cache` because the functional tests run real Gradle builds through
       # GradleTestKit, which serialises a `Project` the cache rejects. Unrelated to the root
       # build's Isolated Projects setting: this invocation makes `perch-gradle-plugin` the root, so
       # it never reads the properties that enable it.
-      - name: Build and test the Gradle plugins
-        run: ./gradlew -p perch-gradle-plugin build --no-configuration-cache
-
-      # A rehearsal of half the release. It costs a minute and it is the only thing that proves the
-      # POM, the sources jar and the javadoc jar Maven Central insists on are all still produced -
-      # a break there is otherwise invisible until a release is already running.
-      - name: Check the plugin artifacts still assemble
-        run: ./gradlew -p perch-gradle-plugin publishToMavenLocal --no-configuration-cache
+      - name: Build, test and assemble the Gradle plugins
+        run: ./gradlew -p perch-gradle-plugin build publishToMavenLocal --no-configuration-cache
 
   library:
     # macOS, because `perch-core` targets iOS and macOS and no other host can compile them.
@@ -103,8 +104,9 @@ jobs:
       # the aggregation plugin end to end against the plugins resolved from `perch-gradle-plugin`
       # through `pluginManagement.includeBuild` - so a change to either plugin that breaks the
       # pipeline fails here even though the plugin build's own tests passed above.
-      - name: Build, lint and test every target
-        run: ./gradlew build
-
-      - name: Check the library artifacts still assemble
-        run: ./gradlew publishToMavenLocal
+      #
+      # `publishToMavenLocal` joins it in the same invocation, for the reason given in the plugins
+      # job: a second `gradlew` would re-configure the whole build to run one more task, and this
+      # job pays macOS minutes for it.
+      - name: Build, lint, test and assemble every target
+        run: ./gradlew build publishToMavenLocal

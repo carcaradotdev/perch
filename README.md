@@ -331,11 +331,14 @@ Two Gradle plugins, applied to different modules:
   runs the Perch KSP processor over that module's own `commonMain` sources, publishes the routes
   it finds on a `perchManifestElements` configuration for an aggregator to pick up, and generates
   an `internal fun perchModuleParser()` into that module's `commonMain`. A single-module app needs
-  no aggregator at all: apply this plugin and call `perchModuleParser()`.
+  no aggregator at all: apply this plugin and call `perchModuleParser()`. Set `outputPackage` to a
+  blank string and the module publishes its routes without generating a parser of its own.
 - **`dev.carcara.perch.aggregation`** — the *aggregator* plugin. Apply it to the module that
   assembles your app (or any module that wants a single `perchParser()` covering several
   producers). It walks this module's own `commonMain` dependency graph, collects every manifest it
-  can reach, and generates the registration function.
+  can reach, and generates the registration function. It is also where a collision between two
+  modules is caught: the producer plugin sees one module at a time, so two features that each
+  declare `/payments/{id}` only meet here.
 
 A module can apply either, both, or neither — each of the sample's two feature modules applies only
 the producer plugin and `sample-app` applies only the aggregator, which is the common shape.
