@@ -146,14 +146,8 @@ internal class RegisteredRoute<T : Any>(
 }
 
 /**
- * Whether a URL has a host is a property of its scheme, never of what the authority happens to
- * contain. In a hierarchical scheme the authority *is* the host by the definition of the URL
- * syntax, single-label ones such as `https://payments/abc` included. A custom app scheme such as
- * `acme://payments/abc` puts the first path element in the authority position by convention and
- * has no host at all.
- *
- * Hardcoded rather than a constructor parameter: two schemes is not a configuration problem, and
- * growing the public constructor for a case nobody has asked for is the worse trade.
+ * Schemes whose authority is a host. A custom scheme such as `acme://payments/abc` puts a path
+ * element in the authority position instead and has no host at all.
  */
 internal val HIERARCHICAL_SCHEMES: Set<String> = setOf("http", "https")
 
@@ -181,10 +175,9 @@ internal class UrlLocation private constructor(
         remainder = url.substring(separatorIndex + SCHEME_SEPARATOR.length)
       } else {
         // A schemeless string is matched as a path and faces neither gate, so anything still
-        // carrying a scheme must be rejected rather than demoted to one. `https:/evil.example/x`
-        // and `https:\evil.example/x` are hierarchical URLs to a browser but have no "://", and
-        // would otherwise arrive as an ordinary first path segment. The character class excludes
-        // '/', so an honest path keeps parsing even with a colon in a later segment.
+        // carrying a scheme is rejected rather than demoted to one: `https:/evil.example/x` is a
+        // hierarchical URL to a browser but has no "://". The pattern excludes '/', so an honest
+        // path with a colon in a later segment keeps parsing.
         if (schemePrefixPattern.containsMatchIn(url)) return null
         scheme = null
         remainder = url
@@ -193,14 +186,13 @@ internal class UrlLocation private constructor(
       val host: String?
       val afterAuthority: String
       if (scheme != null && scheme in HIERARCHICAL_SCHEMES) {
-        // A backslash ends the authority as well. The WHATWG URL standard treats it as a slash
-        // for a special scheme, so `https://evil.example\@acme.com/x` names evil.example to a
-        // browser. Stopping here is what keeps Perch from reading that same URL as acme.com.
+        // A backslash ends the authority too: WHATWG treats it as a slash for a special scheme,
+        // so `https://evil.example\@acme.com/x` names evil.example to a browser, not acme.com.
         val authorityEnd = remainder
           .indexOfFirst { it == '/' || it == '?' || it == '#' || it == '\\' }
           .let { if (it < 0) remainder.length else it }
-        // An http(s) URL with no authority is malformed. Rejecting it is what stops
-        // `https:///payments/abc` from reaching a route without ever facing the host check.
+        // An http(s) URL with no authority is malformed: `https:///payments/abc` would otherwise
+        // reach a route without ever facing the host check.
         host = hostOf(remainder.substring(0, authorityEnd)) ?: return null
         afterAuthority = remainder.substring(authorityEnd)
       } else {
@@ -215,9 +207,9 @@ internal class UrlLocation private constructor(
       val (beforeQuery, queryString) = beforeFragment.split("?", limit = 2)
         .let { it[0] to it.getOrNull(1) }
 
-      // Decoding happens per segment, after the split, so a `%2F` inside a parameter's value
-      // becomes a slash in that value rather than a new segment boundary. The authority is never
-      // decoded: the host check has to judge the same bytes a browser resolves.
+      // Decoding happens per segment, after the split, so a `%2F` inside a value becomes a slash
+      // in that value rather than a segment boundary. The authority is never decoded: the host
+      // check has to judge the same bytes a browser resolves.
       val pathSegments = beforeQuery.split("/").filter { it.isNotEmpty() }.map(::percentDecode)
       val queryParameters = queryString?.let(::parametersOf) ?: DeepLinkParameters.Empty
 
@@ -233,10 +225,9 @@ internal class UrlLocation private constructor(
     }
 
     /**
-     * The host of an authority, or null when the authority is empty or malformed. Drops the
-     * `userinfo@` prefix and the `:port` suffix, neither of which identifies the site, so
-     * `https://acme.com:8443/x` matches a configured host of `acme.com` while
-     * `https://acme.com@evil.example/x` is judged on `evil.example`.
+     * The host of an authority, or null when the authority is empty or malformed. The `userinfo@`
+     * prefix and the `:port` suffix go, so `https://acme.com@evil.example/x` is judged on
+     * `evil.example` and `https://acme.com:8443/x` on `acme.com`.
      */
     private fun hostOf(authority: String): String? {
       if (authority.isEmpty()) return null

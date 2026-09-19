@@ -17,20 +17,13 @@
 package dev.carcara.perch
 
 /*
- * The path-pattern rules, in the one place all three of Perch's Gradle builds can reach.
+ * The path-pattern rules, enforced by `perch-core` at runtime, by `perch-ksp` over one module, and
+ * by `perch-gradle-plugin` across every module an app aggregates. Those are separate Gradle builds
+ * - the plugins arrive through `pluginManagement.includeBuild` - so each adds this directory to its
+ * own source set and compiles its own copy. Nothing here may import anything.
  *
- * `perch-core` enforces them at runtime, `perch-ksp` enforces them over one module at compile time,
- * and `perch-gradle-plugin` enforces them across every module an app aggregates. Those three live
- * in separate Gradle builds - the plugins are pulled in through `pluginManagement.includeBuild`, so
- * no project dependency can span them - and a rule written out three times is a rule that drifts.
- *
- * So this directory is added to each build's source set instead, and each compiles its own copy of
- * the same file. Nothing here may import anything: what makes the arrangement work is that the
- * file needs no dependency any one of the three lacks.
- *
- * Everything is `internal` deliberately. `perch-core` is published under binary-compatibility
- * validation, so a public declaration here would be a promise the 0.0.1 artifact could not take
- * back, for a rule no consumer is meant to call.
+ * Everything is `internal`: `perch-core` is published under binary-compatibility validation, and a
+ * public declaration here would be a promise the artifact could not take back.
  */
 
 /**
@@ -47,8 +40,8 @@ package dev.carcara.perch
  * - `/feature/list` against `/feature/list/details`, a different segment count
  */
 internal fun patternsConflict(pattern1: String, pattern2: String): Boolean {
-  // Dropping the empty pieces is what makes a trailing slash - and a doubled one - invisible here,
-  // so no caller has to normalise the pattern before asking.
+  // Dropping the empty pieces makes a trailing - or doubled - slash invisible, so no caller has to
+  // normalise the pattern first.
   val segments1 = pattern1.split("/").filter { it.isNotEmpty() }
   val segments2 = pattern2.split("/").filter { it.isNotEmpty() }
 
@@ -60,13 +53,12 @@ internal fun patternsConflict(pattern1: String, pattern2: String): Boolean {
 }
 
 /**
- * Joins a route's own `@DeepLink` path to its parents', innermost first, the way a nested route's
- * pattern reads at runtime: `@DeepLink("/orders")` around `@DeepLink("/{id}")` is `orders/{id}`.
+ * Joins a route's own `@DeepLink` path to its parents', innermost first: `@DeepLink("/orders")`
+ * around `@DeepLink("/{id}")` is `orders/{id}`.
  *
- * Shared because both sides have to agree on it exactly. `perch-core` walks a serial descriptor to
- * collect the segments and `perch-ksp` walks a class declaration, so only the collecting differs -
- * and if the joining differed too, the pattern the processor checks for collisions would not be the
- * pattern the parser registers.
+ * `perch-core` collects the segments off a serial descriptor and `perch-ksp` off a class
+ * declaration. Only the collecting may differ: if the joining did too, the pattern the processor
+ * checks for collisions would not be the one the parser registers.
  */
 internal fun joinDeepLinkPattern(segmentsInnermostFirst: List<String>): String {
   val path = StringBuilder()
@@ -85,9 +77,6 @@ internal fun joinDeepLinkPattern(segmentsInnermostFirst: List<String>): String {
 /**
  * Reports whether patterns of different segment counts could still conflict, which happens when
  * the shorter one ends in a tailcard or the longer one's extra segments are all optional.
- *
- * Only [patternsConflict] calls this, and only once the counts differ, so `shorter` below really
- * is the shorter of the two.
  */
 private fun couldMatchWithOptionals(segments1: List<String>, segments2: List<String>): Boolean {
   val (shorter, longer) =
@@ -105,10 +94,12 @@ private fun couldMatchWithOptionals(segments1: List<String>, segments2: List<Str
   return longer.subList(shorter.size, longer.size).all { it.startsWith("{") && it.endsWith("?}") }
 }
 
-/** Reports whether two single segments could match the same URL segment. */
+/**
+ * Reports whether two single segments could match the same URL segment. Two constants conflict
+ * only when they are the same word; any pairing involving a parameter conflicts, because the
+ * parameter matches whatever sits opposite it.
+ */
 private fun segmentsCouldMatch(seg1: String, seg2: String): Boolean {
-  // Two constants conflict only when they are the same word. Any pairing that involves a parameter
-  // conflicts, because the parameter matches whatever sits opposite it.
   val seg1IsParam = seg1.startsWith("{")
   val seg2IsParam = seg2.startsWith("{")
 

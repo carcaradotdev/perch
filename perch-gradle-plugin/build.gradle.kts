@@ -19,32 +19,23 @@ plugins {
   id("dev.carcara.perch.publishing")
 }
 
-// What this artifact's POM says it is. Everything else in that POM - the coordinates, the licence,
-// the developer, the SCM - comes from `dev.carcara.perch.publishing`, which the library modules in
-// the root build apply too, so the three artifacts of a release cannot describe themselves
-// differently.
 description = "Gradle plugins for Perch, a type-safe deep-link library for Kotlin Multiplatform"
 
 kotlin {
   jvmToolchain(21)
 
-  // The path-pattern rules live in `shared/routing` and are compiled into this build from there.
-  // Perch's three Gradle builds cannot depend on one another - the plugins arrive through
-  // `pluginManagement.includeBuild` - and all three have to apply the same rule, so they share the
-  // file rather than a copy of what it says. See the comment at the top of it.
-  sourceSets.named("main") { kotlin.srcDir("../shared/routing") }
-
-  // The manifest format lives in `shared/manifest` and is compiled into this build from there, so
-  // the side that writes a manifest and the side that reads it cannot disagree about its shape.
-  sourceSets.named("main") { kotlin.srcDir("../shared/manifest") }
+  // Perch's three Gradle builds cannot depend on one another, so the path-pattern rules and the
+  // manifest format are shared as source. See the comment at the top of each file.
+  sourceSets.named("main") {
+    kotlin.srcDir("../shared/routing")
+    kotlin.srcDir("../shared/manifest")
+  }
 }
 
-// The producer plugin defaults `perch.processorCoordinates` to the `perch-ksp` artifact published
-// alongside it, which needs a version: `dev.carcara.perch:perch-ksp` on its own does not resolve,
-// and a plugin has no way to ask Gradle at runtime what version it was resolved as. Writing this
-// build's own version into a resource in the jar is what lets `PerchVersion` read it back. The
-// resource sits under the plugin's package so it cannot collide with a `perch.properties` from
-// anything else on the classpath.
+// `perch.processorCoordinates` defaults to the `perch-ksp` artifact published alongside this
+// plugin, which needs a version, and a plugin cannot ask Gradle at runtime what version it was
+// resolved as. `PerchVersion` reads it back out of this resource, which sits under the plugin's
+// package so nothing else on the classpath can collide with it.
 val generatedVersionResources = layout.buildDirectory.dir("generated/perch-version")
 val perchVersionResource = tasks.register<WriteProperties>("perchVersionResource") {
   destinationFile = generatedVersionResources.map {
@@ -69,21 +60,17 @@ tasks.test {
   useJUnit()
   // GradleRunner spawns a real Gradle build per test; the default 512m is not enough.
   maxHeapSize = "2g"
-  // The Kotlin Multiplatform fixture resolves the Kotlin plugin itself, so it needs the
-  // catalog's version rather than a copy that can drift out of step with it.
+  // The fixtures resolve the Kotlin and KSP plugins themselves, so they read the catalog's
+  // versions rather than a copy that can drift.
   systemProperty("perch.kotlinVersion", libs.versions.kotlin.get())
-  // Same reason for KSP: a fixture that applies `com.google.devtools.ksp` resolves it itself.
   systemProperty("perch.kspVersion", libs.versions.ksp.get())
-  // What `perch.processorCoordinates` defaults to is this build's own version, so the test that
-  // pins the default reads it from here rather than repeating the literal.
+  // The test pinning the default `perch.processorCoordinates` reads this build's version from
+  // here rather than repeating the literal.
   systemProperty("perch.pluginVersion", project.version.toString())
-  // PerchProducerPlugin reads KspExtension directly, and PerchAggregationPlugin reads
-  // KotlinMultiplatformExtension, so a fixture that exercises either can't load it via
-  // GradleRunner's withPluginClasspath(): that mechanism loads the plugin under test in a
-  // classloader isolated from whatever loads the portal-resolved `com.google.devtools.ksp` or
-  // `org.jetbrains.kotlin.multiplatform`, so the two disagree on what those extensions even are.
-  // A fixture instead includes this build the way a real consumer does, via
-  // `pluginManagement.includeBuild`, which shares one classloader graph across both plugins.
+  // Both plugins read a KSP or Kotlin extension type directly, so a fixture cannot load them
+  // through GradleRunner's withPluginClasspath(): that isolates the plugin under test from
+  // whatever loads the portal-resolved Kotlin and KSP plugins, and the two then disagree about
+  // what those extensions are. Fixtures include this build the way a consumer does instead.
   systemProperty("perch.pluginBuildDir", project.projectDir.absolutePath)
 }
 

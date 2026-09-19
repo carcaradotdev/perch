@@ -43,18 +43,13 @@ kotlin {
 
   sourceSets {
     commonMain {
-      // The path-pattern rules live in `shared/routing` and are compiled into this build from there.
-      // Perch's three Gradle builds cannot depend on one another - the plugins arrive through
-      // `pluginManagement.includeBuild` - and all three have to apply the same rule, so they share the
-      // file rather than a copy of what it says. See the comment at the top of it.
+      // Perch's three Gradle builds cannot depend on one another, so they share the path-pattern
+      // rules as source. See the comment at the top of the file.
       kotlin.srcDir("../shared/routing")
     }
     commonMain.dependencies {
-      // The only dependency, and `api` because KSerializer is on `register` and `toUrl`, and
-      // because a consumer's route classes are annotated `@DeepLink`, which is `@MetaSerializable`.
-      //
-      // kotlinx-serialization-core rather than -json: nothing here reads or writes JSON, and the
-      // json artifact sat on every consumer's runtime and native compile classpath for nothing.
+      // `api` because KSerializer is on `register` and `toUrl`, and because `@DeepLink` is
+      // `@MetaSerializable`. Core rather than -json: nothing here reads or writes JSON.
       api(libs.kotlinx.serialization.core)
     }
     commonTest.dependencies {

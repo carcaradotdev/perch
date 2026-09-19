@@ -22,11 +22,10 @@ import java.util.Properties
 /**
  * Version of this plugin build, and so of the `perch-ksp` artifact published alongside it.
  *
- * Read from a `perch.properties` resource that `perch-gradle-plugin/build.gradle.kts` generates
- * into the plugin jar, rather than hardcoded here, so a version bump moves one number in one file.
- * It is what makes [PerchExtension.processorCoordinates] default to a coordinate that resolves:
- * `dev.carcara.perch:perch-ksp` with no version does not, and a plugin cannot ask Gradle for its
- * own version at runtime.
+ * Read from a `perch.properties` resource the build generates into the plugin jar rather than
+ * hardcoded, so a version bump moves one number. It is what makes
+ * [PerchExtension.processorCoordinates] default to a coordinate that resolves, since a plugin
+ * cannot ask Gradle for its own version at runtime.
  */
 internal object PerchVersion {
   private const val RESOURCE_NAME = "perch.properties"

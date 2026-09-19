@@ -18,14 +18,12 @@ package dev.carcara.perch.manifest
 
 /*
  * The route manifest: what `perch-ksp` writes for a module and what `perch-gradle-plugin` reads
- * back across every module an app depends on.
+ * back across every module an app depends on. Those are separate Gradle builds, so each compiles
+ * its own copy of this file, the same arrangement as `shared/routing`. Nothing here may import
+ * anything.
  *
- * Those two are separate Gradle builds, so this directory is added to both source sets and each
- * compiles its own copy - the same arrangement, and for the same reason, as `shared/routing`.
- * Writing the format down on one side and reading it on the other is what made the field order a
- * bare index and the filename a literal in two places: change either and nothing fails, because
- * the aggregator's answer to "no manifests matched" is the same warning as a build with no routes
- * in it. Nothing here may import anything.
+ * Both sides share it because neither fails loudly when they disagree: an aggregator that matches
+ * no manifest warns exactly as a build with no routes in it does.
  */
 
 /** Filename `perch-ksp` writes and `perch-gradle-plugin` matches, minus the module's own part. */
@@ -49,12 +47,9 @@ internal data class ManifestRoute(
 )
 
 /**
- * The manifest filename for [moduleId].
- *
- * Named after the module rather than after the package it generates into: two modules that share an
- * output package - the `api`/`impl` split this build is laid out for - would otherwise write
- * manifests of the same name, and the aggregator's diagnostics, which print the filename, could
- * name neither of them.
+ * The manifest filename for [moduleId], named after the module rather than after the package it
+ * generates into: two modules sharing an output package would otherwise write manifests of the
+ * same name, which the aggregator's diagnostics print.
  */
 internal fun manifestFileNameFor(moduleId: String): String {
   val slug = moduleId.map { if (it.isLetterOrDigit()) it else '-' }

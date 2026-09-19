@@ -26,15 +26,12 @@ kotlin {
   explicitApi()
   jvmToolchain(21)
 
-  // The path-pattern rules live in `shared/routing` and are compiled into this build from there.
-  // Perch's three Gradle builds cannot depend on one another - the plugins arrive through
-  // `pluginManagement.includeBuild` - and all three have to apply the same rule, so they share the
-  // file rather than a copy of what it says. See the comment at the top of it.
-  sourceSets.named("main") { kotlin.srcDir("../shared/routing") }
-
-  // The manifest format lives in `shared/manifest` and is compiled into this build from there, so
-  // the side that writes a manifest and the side that reads it cannot disagree about its shape.
-  sourceSets.named("main") { kotlin.srcDir("../shared/manifest") }
+  // Perch's three Gradle builds cannot depend on one another, so the path-pattern rules and the
+  // manifest format are shared as source. See the comment at the top of each file.
+  sourceSets.named("main") {
+    kotlin.srcDir("../shared/routing")
+    kotlin.srcDir("../shared/manifest")
+  }
 }
 
 dependencies {

@@ -51,9 +51,8 @@ internal class ParametersDecoder(
       val elementKind = descriptor.getElementDescriptor(elementIndex).kind
       val isPrimitive = elementKind is PrimitiveKind
       val isEnum = elementKind is SerialKind.ENUM
-      // A property that is neither primitive nor enum is a nested structure, which gets decoded
-      // whether or not a parameter of its own name arrived. A primitive with no parameter is
-      // skipped, so its default (or null) stands.
+      // A nested structure is decoded whether or not a parameter of its own name arrived. A
+      // primitive with no parameter is skipped, so its default (or null) stands.
       if (!(isPrimitive || isEnum) || parameters.contains(currentName)) {
         return elementIndex
       }
@@ -99,9 +98,8 @@ private class ListLikeDecoder(
 }
 
 /**
- * What both decoders above have in common: a route parameter arrives as text, so every primitive
- * and every enum is that text reinterpreted. Only where the text comes from differs, which is why
- * [decodeString] is the one thing a subclass has to answer.
+ * A route parameter arrives as text, so every primitive and every enum is that text reinterpreted.
+ * Only where the text comes from differs, which is why [decodeString] is all a subclass answers.
  */
 @OptIn(ExperimentalSerializationApi::class)
 internal abstract class StringBackedDecoder : AbstractDecoder() {

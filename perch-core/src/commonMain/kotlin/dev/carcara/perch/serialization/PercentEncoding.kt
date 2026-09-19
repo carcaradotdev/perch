@@ -18,9 +18,8 @@ package dev.carcara.perch.serialization
 
 /**
  * The RFC 3986 unreserved set. Every other byte is percent-encoded, which over-encodes the
- * sub-delimiters a path segment could legally carry unescaped. Over-encoding costs a few
- * characters and decodes back to the same string; under-encoding produces a URL that means
- * something different from the value it was built out of.
+ * sub-delimiters a path segment could legally carry raw: over-encoding costs a few characters and
+ * decodes back to the same string, under-encoding changes what the URL means.
  */
 private const val UNRESERVED = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~"
 
@@ -57,10 +56,9 @@ internal fun percentEncode(value: String): String {
 /**
  * Reverses [percentEncode].
  *
- * A `%` that is not followed by two hex digits is kept as a literal `%` rather than rejected, and
- * bytes that do not form valid UTF-8 become the replacement character. A deep link arrives from
- * outside the app, so a malformed one has to produce a value rather than an exception; whether
- * that value matches a route is then the ordinary matching question.
+ * A `%` not followed by two hex digits is kept literal and invalid UTF-8 becomes the replacement
+ * character. A deep link arrives from outside the app, so a malformed one has to produce a value
+ * rather than an exception, and whether it matches a route is the ordinary question.
  *
  * `+` is left alone. It means a space only in `application/x-www-form-urlencoded`, which is a form
  * body's encoding, not a URL's.
@@ -78,8 +76,8 @@ internal fun percentDecode(value: String): String {
       index += 3
       continue
     }
-    // Copy the whole run up to the next escape in one go, so a surrogate pair is encoded as the
-    // one code point it is rather than as two unpaired halves.
+    // The whole run up to the next escape at once, so a surrogate pair is encoded as the one code
+    // point it is rather than as two unpaired halves.
     val nextEscape = value.indexOf('%', startIndex = index + 1)
     val runEnd = if (nextEscape < 0) value.length else nextEscape
     value.substring(index, runEnd).encodeToByteArray().forEach { bytes.add(it) }

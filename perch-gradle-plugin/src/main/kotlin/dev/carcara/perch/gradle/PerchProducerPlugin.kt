@@ -25,11 +25,7 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
 
-/**
- * Targets a module needs before Kotlin Multiplatform gives it a `commonMain` compilation, which is
- * the compilation the Perch processor runs on. Below this there is no `kspCommonMainKotlinMetadata`
- * task for the manifest artifact to be built by.
- */
+/** Targets a module needs before Kotlin Multiplatform gives it a `commonMain` compilation. */
 private const val MINIMUM_TARGETS = 2
 
 public abstract class PerchExtension {
@@ -62,8 +58,8 @@ public class PerchProducerPlugin : Plugin<Project> {
     val extension = project.extensions.create("perch", PerchExtension::class.java)
     extension.processorCoordinates.convention("dev.carcara.perch:perch-ksp:${PerchVersion.value}")
 
-    // The perch-manifest-*.txt files the processor writes land in the shared KSP resources
-    // directory, so this publishes that directory and the consumer filters by filename.
+    // The processor writes its manifests into the shared KSP resources directory, so this
+    // publishes the whole directory and the consumer filters by filename.
     val kspManifestsDir = project.layout.buildDirectory.dir("generated/ksp/metadata/commonMain/resources")
     project.configurations.consumable("perchManifestElements") {
       attributes { attribute(PERCH_MANIFEST_ATTRIBUTE, "true") }
@@ -71,9 +67,7 @@ public class PerchProducerPlugin : Plugin<Project> {
     }
 
     // `dependencies.addLater` defers this lambda to execution time, so it must not close over
-    // `project` itself — that would pull a live `Project` reference into cached task state,
-    // the single most common configuration-cache violation. Capture the `DependencyHandler`
-    // value instead.
+    // `project` itself: that pulls a live `Project` into cached task state. Capture the handler.
     val dependencyHandler = project.dependencies
     project.configurations.matching { it.name == "kspCommonMainMetadata" }.configureEach {
       dependencies.addLater(
@@ -90,26 +84,23 @@ public class PerchProducerPlugin : Plugin<Project> {
     project.plugins.withId("com.google.devtools.ksp") {
       val ksp = project.extensions.getByType(KspExtension::class.java)
       // Same reason as above: `ksp.arg`'s Provider overload defers this lambda too, so it
-      // captures the project's path as a plain String rather than the `Project` itself.
+      // captures the path as a String rather than the `Project`.
       val projectPath = project.path
       val outputPackage = project.provider {
         extension.outputPackage.orNull
           ?: throw GradleException("dev.carcara.perch: set `perch.outputPackage` in $projectPath")
       }
       ksp.arg("perch.outputPackage", outputPackage)
-      // Manifests are named after the declaring module rather than after the package it generates
-      // into, so two modules sharing an output package still publish two distinguishable files.
+      // Manifests are named after the declaring module, so two modules sharing an output package
+      // still publish two distinguishable files.
       ksp.arg("perch.moduleId", projectPath)
     }
 
     project.plugins.withId(KOTLIN_MULTIPLATFORM_ID) { compileGeneratedRegistration(project) }
 
     // afterEvaluate runs during configuration, before configuration-cache state is captured, so
-    // closing over `project` here (unlike the two deferred lambdas above) is not a CC violation.
-    // It is also the earliest honest point for the target check below: targets are declared inside
-    // the `kotlin { }` block, so nothing can count them until the build script has finished
-    // running. Both checks throw during configuration, which is what puts the message in front of
-    // the person before Gradle goes looking for a task that was never created.
+    // closing over `project` here is not a violation. It is also the earliest point that can count
+    // targets, since they are declared inside the `kotlin { }` block.
     project.afterEvaluate {
       if (!project.pluginManager.hasPlugin("com.google.devtools.ksp")) {
         throw GradleException(
@@ -122,29 +113,14 @@ public class PerchProducerPlugin : Plugin<Project> {
   }
 
   /**
-   * Puts the processor's generated Kotlin on the module's own compile path, so the module can call
-   * the `perchModuleParser()` it generates.
+   * Puts the processor's generated Kotlin on the module's own compile path, so a module with no
+   * aggregator anywhere can still call the `perchModuleParser()` it generates.
    *
-   * Without this the module publishes a manifest for an aggregator and nothing else: the generated
-   * file is written but no source set holds it and no compile task waits for it, which leaves the
-   * single-module case - routes and a parser in one module, no aggregator anywhere - with a
-   * function it cannot call.
-   *
-   * Unlike `dev.carcara.perch.aggregation`, which hands its generator's `TaskProvider` straight to
-   * `srcDir` and lets every consumer inherit the dependency, this adds the directory by *path* and
-   * wires the ordering separately. A `srcDir` carrying a `builtBy` is a directory the KSP metadata
-   * task itself must wait for, since that task compiles `commonMain`, and Gradle rejects the
-   * result outright: "Circular dependency between the following tasks:
-   * kspCommonMainKotlinMetadata \--- kspCommonMainKotlinMetadata".
-   *
-   * So each consumer is named instead. The Kotlin compilations are the ones that matter; the
-   * others read the directory without compiling it and fail validation rather than produce a wrong
-   * answer ("uses this output of task ... without declaring an explicit or implicit dependency").
-   * Detekt and the sources jars are matched by name because neither type is on this plugin's
-   * classpath, and both are absent unless the module opts into them.
-   *
-   * Applying `dev.carcara.perch.aggregation` to the same module stays fine: that plugin generates
-   * a differently named `perchParser()` into a directory of its own.
+   * The directory is added by path and the ordering wired separately, task by task. A `srcDir`
+   * carrying a `builtBy` would be a directory the KSP metadata task must wait for, and that task
+   * is the one compiling `commonMain`: "Circular dependency between the following tasks:
+   * kspCommonMainKotlinMetadata \--- kspCommonMainKotlinMetadata". Detekt and the sources jars are
+   * matched by name because neither type is on this plugin's classpath.
    */
   private fun compileGeneratedRegistration(project: Project) {
     val generatedSources =
@@ -164,28 +140,14 @@ public class PerchProducerPlugin : Plugin<Project> {
   }
 
   /**
-   * Perch reads routes out of `commonMain`, and Kotlin Multiplatform only creates the `commonMain`
-   * compilation - the one KSP registers `kspCommonMainKotlinMetadata` for, and the one this
-   * plugin's manifest artifact is built by - for a module declaring two or more targets.
-   *
-   * Without this, a single-target module configures cleanly and fails much later with Gradle's own
-   * `Task with name 'kspCommonMainKotlinMetadata' not found`, which names neither Perch, nor KSP,
-   * nor the requirement, and which is raised in whichever module is doing the aggregating rather
-   * than the one that is misconfigured.
+   * Perch reads routes out of `commonMain`, which Kotlin Multiplatform only creates for a module
+   * declaring two or more targets. Without this check a single-target module configures cleanly
+   * and fails later with Gradle's own `Task with name 'kspCommonMainKotlinMetadata' not found`,
+   * raised in whichever module aggregates rather than in the one that is misconfigured.
    */
   private fun requireCommonMainCompilation(project: Project) {
-    // Asking through `hasPlugin` rather than through `extensions.findByType` is what makes a named
-    // message possible: `getByType` below throws
-    // "Extension of type 'KotlinMultiplatformExtension' does not exist. Currently registered
-    // extension types: [...]" - a dump of every extension in the project, naming neither Perch nor
-    // the requirement. This is reached by a `kotlin("jvm")` module that applies KSP and Perch,
-    // which is an ordinary shape, not a contrived one.
-    //
-    // It is not protection against the Kotlin Gradle plugin being absent from the classpath. That
-    // failure is real (KGP is `compileOnly` here, so with no Kotlin plugin applied anywhere the
-    // class genuinely does not load) but it is unreachable: getting this far needs KSP, KSP needs
-    // a Kotlin plugin, and a Kotlin plugin is what puts the class on the classpath. A module with
-    // no Kotlin plugin at all fails on the KSP check above, several lines earlier.
+    // Asked through `hasPlugin` rather than `findByType` so a `kotlin("jvm")` module gets this
+    // message: `getByType` below would instead dump every extension registered in the project.
     if (!project.pluginManager.hasPlugin(KOTLIN_MULTIPLATFORM_ID)) {
       throw GradleException(
         "dev.carcara.perch: Kotlin Multiplatform is not applied on ${project.path}. Perch scans " +
@@ -194,9 +156,8 @@ public class PerchProducerPlugin : Plugin<Project> {
       )
     }
 
-    // The metadata target is filtered out: it is the commonMain compilation itself, not one of the
-    // targets whose existence creates it, so counting it would make every module look like it has
-    // one more target than its build script declares.
+    // The metadata target is the commonMain compilation itself, not one of the targets whose
+    // existence creates it, so counting it would inflate every module by one.
     val targets = project.extensions.getByType(KotlinMultiplatformExtension::class.java)
       .targets
       .filter { it.platformType != KotlinPlatformType.common }

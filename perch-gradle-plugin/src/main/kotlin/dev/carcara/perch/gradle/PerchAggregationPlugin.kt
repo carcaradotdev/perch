@@ -44,14 +44,12 @@ public abstract class PerchAggregationExtension {
  * module reachable through this module's own dependencies and generates a single
  * `perchParser()` factory into `commonMain`.
  *
- * The graph it walks is this module's `commonMain` compile graph, so what it can discover is
- * exactly what this module can compile against. A producer reachable only through another module's
- * `implementation` bucket is not on that graph and contributes no routes - correctly, because its
- * route types are not visible here either, and generating a `register<T>()` for one would not
- * compile. Depend on such a module directly, or have the module between them use `api`.
- *
- * Discovery runs through the dependency graph rather than over `rootProject.subprojects`, so it
- * stays within the applying project and does not trip Isolated Projects.
+ * The graph it walks is this module's `commonMain` compile graph, so what it discovers is what
+ * this module can compile against. A producer reachable only through another module's
+ * `implementation` bucket contributes no routes - correctly, since `register<T>()` for a type this
+ * module cannot name would not compile. Depend on it directly, or have the module between use
+ * `api`. Walking the graph rather than `rootProject.subprojects` also keeps this inside the
+ * applying project, which Isolated Projects requires.
  *
  * A dependency that publishes no manifest contributes no routes and does not fail the build.
  */
@@ -75,8 +73,7 @@ public class PerchAggregationPlugin : Plugin<Project> {
 
     // afterEvaluate runs during configuration, before configuration-cache state is captured, so
     // holding `project` here is not a violation. Without Kotlin Multiplatform there is no
-    // commonMain to generate into and no dependency graph to walk, and the task would otherwise
-    // quietly generate an empty function - the exact silent failure this plugin has to avoid.
+    // commonMain to generate into, and the task would quietly generate an empty function.
     project.afterEvaluate {
       if (!project.pluginManager.hasPlugin(KOTLIN_MULTIPLATFORM_ID)) {
         throw GradleException(
@@ -92,15 +89,11 @@ public class PerchAggregationPlugin : Plugin<Project> {
     val manifestsConfiguration = project.configurations.resolvable("perchManifests") {
       description = "Route manifests published by this module's dependencies"
       GRAPH_CONFIGURATIONS.forEach { extendsFrom(project.configurations.getByName(it)) }
-      // Walking the graph needs an unambiguous request: a Kotlin Multiplatform module publishes
-      // eight or more variants, and an attribute-free resolution can only choose between them by
-      // accident - it happens to work for a jvm() dependency and fails outright for an iOS one.
-      // These two are what the Kotlin Gradle plugin itself asks for when it resolves commonMain,
-      // minus its `category` and `jvm.environment`, both of which were measured to be redundant
-      // here: `usage` alone already separates metadataApiElements from the sources and
-      // documentation variants. So this sees exactly the graph commonMain compiles against, on
-      // every target, which is also the guarantee that every route it discovers is a type this
-      // module can actually name.
+      // A Kotlin Multiplatform module publishes eight or more variants, so an attribute-free
+      // resolution picks one by accident - it works for a jvm() dependency and fails for an iOS
+      // one. These two are what the Kotlin Gradle plugin asks for when it resolves commonMain, so
+      // this sees the same graph, which is what makes every discovered route a type this module
+      // can name.
       attributes {
         attribute(
           Usage.USAGE_ATTRIBUTE,
@@ -110,9 +103,8 @@ public class PerchAggregationPlugin : Plugin<Project> {
       }
     }
 
-    // withVariantReselection() then picks each dependency's manifest variant rather than the
-    // compile output selected above; lenient(true) is what lets a dependency publishing no
-    // manifest at all - which is most of them - drop out instead of failing the build.
+    // withVariantReselection() picks each dependency's manifest variant rather than the compile
+    // output selected above; lenient(true) lets a dependency publishing no manifest drop out.
     val manifestArtifacts = manifestsConfiguration.get().incoming
       .artifactView {
         withVariantReselection()
@@ -123,8 +115,8 @@ public class PerchAggregationPlugin : Plugin<Project> {
 
     val manifestFiles =
       manifestArtifacts.artifactFiles.asFileTree.matching { include(MANIFEST_FILE_PATTERN) }
-    // Resolved at execution time, from a provider that holds the artifact collection rather than
-    // the project. What `lenient(true)` swallows lands here, and the task reports it.
+    // What `lenient(true)` swallows lands here for the task to report. The provider holds the
+    // artifact collection rather than the project, so it resolves at execution time.
     val resolutionFailures = project.provider {
       manifestArtifacts.failures.map { failure ->
         generateSequence(failure as Throwable) { it.cause }
@@ -138,8 +130,8 @@ public class PerchAggregationPlugin : Plugin<Project> {
       this.resolutionFailures.set(resolutionFailures)
     }
 
-    // Handing the TaskProvider to srcDir makes every consumer of commonMain sources depend on
-    // generation implicitly, so no consumer has to remember to wire the task up.
+    // The TaskProvider, not the directory: every consumer of commonMain sources then depends on
+    // generation without having to wire the task up.
     project.extensions.getByType(KotlinMultiplatformExtension::class.java)
       .sourceSets
       .named("commonMain") { kotlin.srcDir(generate) }

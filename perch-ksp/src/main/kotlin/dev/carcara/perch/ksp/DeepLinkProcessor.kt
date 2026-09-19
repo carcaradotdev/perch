@@ -37,9 +37,8 @@ import java.io.OutputStreamWriter
 /**
  * KSP processor that generates a `perchModuleParser()` factory over the module's routes.
  *
- * The rule is one sentence: a class in this module's own sources annotated
- * `@dev.carcara.perch.DeepLink` is a route. There is no supertype to implement and nothing else to
- * satisfy, and the processor never looks outside the module it runs on.
+ * A class in this module's own sources annotated `@dev.carcara.perch.DeepLink` is a route. There
+ * is no supertype to implement, and the processor never looks outside the module it runs on.
  */
 internal class DeepLinkProcessor(
   private val codeGenerator: CodeGenerator,
@@ -61,8 +60,8 @@ internal class DeepLinkProcessor(
     processed = true
 
     val outputPackage = options["perch.outputPackage"].orEmpty()
-    // The declaring module's Gradle path, which the producer plugin passes and manifests are named
-    // after. A processor run by hand has no plugin to pass it, so the output package stands in.
+    // The declaring module's Gradle path, passed by the producer plugin. A processor run by hand
+    // has no plugin to pass it, so the output package stands in.
     val moduleId = options["perch.moduleId"]?.takeIf { it.isNotBlank() }
       ?: outputPackage.ifBlank { "root" }
 
@@ -81,9 +80,8 @@ internal class DeepLinkProcessor(
     val routeSources = routeClasses.mapNotNull { it.containingFile }.distinct().toTypedArray()
     generateManifestFile(moduleId, routes, routeSources)
 
-    // A blank output package is how a module says it contributes its routes to an aggregator
-    // without wanting a parser of its own. Its manifest is written above either way, which is what
-    // `PerchExtension.outputPackage` promises and what makes the setting about codegen alone.
+    // A blank output package means the module contributes its routes to an aggregator and wants
+    // no parser of its own. Its manifest is written above either way.
     if (outputPackage.isNotBlank()) {
       generateRegistrationFile(outputPackage, routes, routeSources)
     }
@@ -109,10 +107,8 @@ internal class DeepLinkProcessor(
   /**
    * The `@DeepLink` on [classDecl], or null when it carries none.
    *
-   * Matching the short name first is what keeps this cheap. Resolving an annotation's type is a
-   * KSP type-resolution, and every class in the module arrives here with its full annotation list -
-   * `@Serializable`, `@Inject`, `@Composable` and the rest - so resolving each one only to reject
-   * it is the most-repeated work in the processor. The short name settles almost all of them.
+   * The short name is matched first because resolving an annotation's type is a KSP type
+   * resolution, and every class arrives here with its whole annotation list.
    */
   private fun deepLinkAnnotation(classDecl: KSClassDeclaration): KSAnnotation? =
     classDecl.annotations.find { annotation ->
@@ -121,23 +117,10 @@ internal class DeepLinkProcessor(
     }
 
   /**
-   * Both generated files declare the route sources they were built from, and declare themselves
-   * aggregating, because that is what they are: the processor scans the whole module.
-   *
-   * `Dependencies(aggregating = false)` with no source files, which is what this used to pass,
-   * says the output depends on nothing. The generated file lands in `commonMain`, so the next
-   * build sees it as a changed source and KSP runs an incremental round; an output that depends on
-   * nothing is not attributed to any surviving source, so KSP deletes it. The build after that
-   * finds the file missing, regenerates it, and the two states alternate forever - green, red,
-   * green, red. Repeated `./gradlew build` runs over `sample/` are what catches this; nothing in
-   * the compile-testing suite reaches KSP's incremental machinery.
-   */
-  /**
    * One [ManifestRoute] per route in [routeClasses], or null once an error has been logged.
    *
-   * Reporting through the logger, rather than throwing, is what fails the KSP round with a
-   * COMPILATION_ERROR instead of an uncaught-exception INTERNAL_ERROR: KSP fails the build once any
-   * error is logged, without needing the round to unwind via an exception.
+   * Errors go through the logger rather than an exception: KSP fails the build once any error is
+   * logged, and does so as a COMPILATION_ERROR rather than an INTERNAL_ERROR.
    */
   private fun manifestRoutes(
     moduleId: String,
@@ -167,14 +150,12 @@ internal class DeepLinkProcessor(
   /**
    * The full path pattern of [classDecl], its parents' patterns included.
    *
-   * A nested route's pattern is its own `@DeepLink` path appended to its parent's: the parser
-   * derives it that way from the serial descriptor, and a processor that read only the annotation
-   * would check a pattern the parser never registers. Two sibling routes each annotated `/{id}`
-   * under different parents would then fail the build for a collision that does not exist, and a
-   * nested `/orders/{id}` that genuinely does collide with a top-level one would pass.
+   * A nested route's pattern is its own `@DeepLink` path appended to its parent's, which is how
+   * the parser derives it too. Reading only the annotation would check a pattern the parser never
+   * registers, failing the build for collisions that do not exist and missing the ones that do.
    *
    * The parent is the property whose own type is a route, and there is at most one: a route
-   * reached by two different paths would have two patterns and no way to choose between them.
+   * reached by two paths would have two patterns and no way to choose between them.
    */
   private fun composedPattern(classDecl: KSClassDeclaration): String? {
     val segments = mutableListOf<String>()
@@ -212,17 +193,15 @@ internal class DeepLinkProcessor(
     routeSources: Array<KSFile>,
   ) {
     val file = codeGenerator.createNewFile(
-      dependencies = Dependencies(aggregating = true, *routeSources),
+      dependencies = dependenciesOn(routeSources),
       packageName = packageName,
       fileName = "DeepLinkRegistration",
     )
 
     OutputStreamWriter(file).use { writer ->
-      // Only the parser and the logger are imported: they are the ones named in the signature.
-      // Route types are written fully qualified, on purpose. Importing them by simple name would
-      // collide the moment two routes in this module share a simple name from different packages
-      // - `com.acme.a.Details` and `com.acme.b.Details` - which scanning the whole module (rather
-      // than one guessed package) makes an ordinary occurrence, not a rare one.
+      // Routes are written fully qualified: importing them by simple name would collide the
+      // moment two routes in this module share one, which scanning the whole module makes
+      // ordinary rather than rare.
       writer.write("package $packageName\n\n")
       writer.write("import $LOGGER_CLASS\n")
       writer.write("import $PARSER_CLASS\n\n")
@@ -240,8 +219,7 @@ internal class DeepLinkProcessor(
       writer.write("  logger: $loggerSimpleName = $loggerSimpleName.None,\n")
       writer.write("): $parserSimpleName = $parserSimpleName(schemes, hosts, logger).apply {\n")
       // The manifest's own routes: a class whose @DeepLink path could not be read was skipped
-      // when they were collected, so registering it here would emit a register<T>() no manifest
-      // knows about.
+      // when they were collected, and registering it here would name it in neither file.
       routes.sortedBy { it.routeClassName }.forEach { route ->
         writer.write("  register<${route.routeClassName}>()\n")
       }
@@ -257,7 +235,7 @@ internal class DeepLinkProcessor(
     routeSources: Array<KSFile>,
   ) {
     val manifestFile = codeGenerator.createNewFile(
-      dependencies = Dependencies(aggregating = true, *routeSources),
+      dependencies = dependenciesOn(routeSources),
       packageName = "",
       fileName = manifestFileNameFor(moduleId),
       extensionName = MANIFEST_FILE_EXTENSION,
@@ -269,6 +247,18 @@ internal class DeepLinkProcessor(
 
     logger.info("DeepLinkProcessor: generated manifest with ${routes.size} routes for $moduleId")
   }
+
+  /**
+   * Both generated files declare the route sources they were built from and declare themselves
+   * aggregating, because the processor scans the whole module.
+   *
+   * An output that depends on nothing is attributed to no surviving source, so KSP deletes it on
+   * the incremental round the generated file itself triggers; the build after that regenerates it,
+   * and the two states alternate forever. Only repeated `./gradlew build` runs catch this, since
+   * the compile-testing suite never reaches KSP's incremental machinery.
+   */
+  private fun dependenciesOn(routeSources: Array<KSFile>): Dependencies =
+    Dependencies(aggregating = true, *routeSources)
 
   /** The @DeepLink annotation has a single "path" argument. */
   private fun deepLinkPath(classDecl: KSClassDeclaration): String? =

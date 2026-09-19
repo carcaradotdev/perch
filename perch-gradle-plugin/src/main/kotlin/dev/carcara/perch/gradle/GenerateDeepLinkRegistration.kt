@@ -44,7 +44,7 @@ public abstract class GenerateDeepLinkRegistration : DefaultTask() {
   @get:PathSensitive(PathSensitivity.RELATIVE)
   public abstract val manifests: ConfigurableFileCollection
 
-  /** Package the generated extension is emitted into. Required, and deliberately without a convention. */
+  /** Package the generated extension is emitted into. Required, with no convention. */
   @get:Input
   public abstract val outputPackage: Property<String>
 
@@ -68,8 +68,8 @@ public abstract class GenerateDeepLinkRegistration : DefaultTask() {
     val unparseable = mutableListOf<String>()
     manifestFiles.forEach { file -> read(file, routes, unparseable) }
 
-    // By route class, not by line: one module's manifest is reachable through more than one path
-    // in the graph, so the same route arrives more than once and is not a collision with itself.
+    // By route class, not by line: a manifest reachable through several paths in the graph
+    // delivers the same route more than once, and a route does not collide with itself.
     val discovered = routes.distinctBy { it.route.routeClassName }
     failOnConflict(discovered)
 
@@ -93,14 +93,9 @@ public abstract class GenerateDeepLinkRegistration : DefaultTask() {
   /**
    * Fails the build when two routes could match the same URL.
    *
-   * This is the only place the question can be asked. The processor sees one module at a time and
-   * the parser sees them all, but only at runtime: without this, two feature modules declaring
-   * `/payments/{id}` and `/payments/{code}` build green on every job, and the app throws
-   * `DeepLinkCollisionException` the first time it builds a parser - a launch crash for a mistake
-   * that belongs to whoever added the second route.
-   *
-   * Comparing every pair is quadratic in the number of routes an app declares. At the scale where
-   * that costs anything the task is cached, and it runs once per aggregating module.
+   * The only place the question can be asked at build time: the processor sees one module and the
+   * parser sees them all but only at runtime, so two features declaring `/payments/{id}` and
+   * `/payments/{code}` would otherwise build green and crash the app on its first parser.
    */
   private fun failOnConflict(routes: List<DiscoveredRoute>) {
     for (i in routes.indices) {
@@ -124,15 +119,13 @@ public abstract class GenerateDeepLinkRegistration : DefaultTask() {
   private data class DiscoveredRoute(val file: File, val route: ManifestRoute)
 
   private fun write(packageName: String, routes: List<String>) {
-    // Only the parser and the logger are imported: they are the ones named in the signature. A
-    // route is written fully qualified on purpose: importing route types by simple name collides
-    // the moment two modules declare `com.acme.a.Details` and `com.acme.b.Details`, and an
-    // aggregator that spans every module in an app makes that ordinary rather than rare.
+    // Routes are written fully qualified: importing them by simple name collides the moment two
+    // modules declare `com.acme.a.Details` and `com.acme.b.Details`, which spanning a whole app
+    // makes ordinary.
     val registrations = routes.joinToString("\n") { "  register<$it>()" }
-    // Not `DeepLinkRegistration.kt`: that is what the KSP processor writes into a producer's own
-    // outputPackage, and a module that both declares a route and aggregates - an app module with
-    // one route in it - would otherwise get two files of that name in one package and a
-    // duplicate-JVM-facade error naming neither Perch nor the reason.
+    // Not `DeepLinkRegistration.kt`: the KSP processor writes that into a producer's own
+    // outputPackage, and a module that both declares a route and aggregates would end up with two
+    // files of one name and a duplicate-JVM-facade error naming neither Perch nor the reason.
     val outputFile = outputDirectory.get()
       .file(packageName.replace('.', '/') + "/PerchDeepLinkRegistration.kt")
       .asFile
@@ -161,9 +154,9 @@ public abstract class GenerateDeepLinkRegistration : DefaultTask() {
   }
 
   /**
-   * Manifests resolve leniently, so a dependency whose manifest failed to resolve and a dependency
-   * that publishes no manifest at all produce the same empty result. Without this, the only symptom
-   * of the first case is a deep link that never resolves at runtime, months later.
+   * Manifests resolve leniently, so a dependency whose manifest failed to resolve looks exactly
+   * like one that publishes none. Unreported, the first case only shows up as a deep link that
+   * never resolves at runtime.
    */
   private fun report(
     manifestFiles: List<File>,

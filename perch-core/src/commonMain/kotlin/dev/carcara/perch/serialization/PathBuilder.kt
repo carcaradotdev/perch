@@ -57,9 +57,8 @@ internal fun <T> DeepLinkFormat.encodeToPath(serializer: KSerializer<T>, value: 
 /**
  * The path elements [segment] expands to, marking any name it consumed as used.
  *
- * The segment grammar comes from [PathSegment.parse], the same classification `parse` matches URLs
- * with. Recognising `{name}`, `{name?}` and `{name...}` a second time here is how the two
- * directions drift: a placeholder form added to one would go on silently not existing in the other.
+ * The grammar comes from [PathSegment.parse], the same classification `parse` matches URLs with.
+ * Recognising the placeholder forms a second time here is how the two directions drift apart.
  */
 private fun fill(
   segment: PathSegment,
