@@ -46,8 +46,8 @@ plugins {
     kotlin("multiplatform") version "2.4.10" apply false
     kotlin("plugin.serialization") version "2.4.10" apply false
     id("com.google.devtools.ksp") version "2.3.10" apply false
-    id("dev.carcara.perch") version "0.1.0-SNAPSHOT" apply false
-    id("dev.carcara.perch.aggregation") version "0.1.0-SNAPSHOT" apply false
+    id("dev.carcara.perch") version "0.1.0" apply false
+    id("dev.carcara.perch.aggregation") version "0.1.0" apply false
 }
 ```
 
@@ -69,7 +69,7 @@ The library coordinates:
 `perch-core` is Kotlin Multiplatform and depends on `kotlinx-serialization-core` and nothing else.
 `perch-ksp` is a plain Kotlin/JVM module, not Multiplatform at all — KSP processors run on the JVM
 regardless of the targets of the module they process, so it does not need to be. Both are version
-`0.1.0-SNAPSHOT`.
+`0.1.0`.
 
 ## Quick start
 
@@ -115,7 +115,7 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            api("dev.carcara.perch:perch-core:0.1.0-SNAPSHOT")
+            api("dev.carcara.perch:perch-core:0.1.0")
         }
     }
 }
@@ -166,7 +166,7 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            implementation("dev.carcara.perch:perch-core:0.1.0-SNAPSHOT")
+            implementation("dev.carcara.perch:perch-core:0.1.0")
             implementation(project(":my-routes"))
         }
     }
