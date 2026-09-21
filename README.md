@@ -7,23 +7,14 @@ your app's decision, not Perch's.
 
 ## Installation
 
-Perch is not yet on Maven Central (see [Status](#status) below); for now, publish it to your local
-Maven repository from a checkout of this repository and consume it from there:
-
-```bash
-git clone https://github.com/carcaradotdev/perch
-cd perch
-./gradlew publishToMavenLocal
-./gradlew -p perch-gradle-plugin publishToMavenLocal
-```
-
-Then, in your app:
+Perch publishes to Maven Central. Both Gradle plugins are there too rather than on the Gradle
+Plugin Portal, so `mavenCentral()` belongs in `pluginManagement` alongside `gradlePluginPortal()`,
+which stays for the Kotlin and KSP plugins.
 
 ```kotlin
 // settings.gradle.kts
 pluginManagement {
     repositories {
-        mavenLocal() // until Perch is on Maven Central
         gradlePluginPortal()
         mavenCentral()
     }
@@ -31,7 +22,6 @@ pluginManagement {
 
 dependencyResolutionManagement {
     repositories {
-        mavenLocal() // until Perch is on Maven Central
         mavenCentral()
     }
 }
@@ -384,11 +374,10 @@ supply one.
 
 ## Status
 
-No version has been released yet, so `mavenLocal()` is still how you consume Perch. Everything
-around that is in place: three artifacts — `perch-core`, `perch-ksp` and `perch-gradle-plugin`,
-the last alongside both plugin markers — each carry the sources jar, javadoc jar and complete POM
-Maven Central requires, and all three take their coordinates, licence, developer and SCM from one
-convention plugin so a release cannot describe one of them differently from the others.
+Perch ships three artifacts — `perch-core`, `perch-ksp` and `perch-gradle-plugin`, the last
+alongside both plugin markers. Each carries the sources jar, javadoc jar and complete POM Maven
+Central requires, and all three take their coordinates, licence, developer and SCM from one
+convention plugin, so a release cannot describe one of them differently from the others.
 `perch-core` is under a binary-compatibility (`apiCheck`/`apiDump`) guard; the processor and the
 plugin are not, because nothing is ever compiled against them.
 
