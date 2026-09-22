@@ -1,0 +1,102 @@
+# Copyright 2026 Carcara
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Publish staged deployments
+
+# Releases the two deployments `release.yml` leaves staged in the Central Portal, in one run.
+#
+# Perch ships from two Gradle builds, so the Portal receives two deployments and no single upload
+# can be the whole release. `release.yml` therefore uploads without releasing. This is the other
+# half: both are checked to be VALIDATED before either is released, so the half-published state -
+# the plugin on Maven Central without the library it needs, immutable and unfixable - takes two
+# failures in a row rather than one.
+on:
+  workflow_dispatch:
+    inputs:
+      plugin_deployment_id:
+        description: The deployment holding perch-gradle-plugin and both plugin markers
+        required: true
+      library_deployment_id:
+        description: The deployment holding perch-core and perch-ksp
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-deployments
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  publish:
+    name: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # A Central Portal user token, the same pair `release.yml` uploads with. The Portal wants it
+      # as `Bearer <base64 of username:password>`; `tr -d '\n'` because GNU base64 wraps at 76
+      # columns and a wrapped header is not a header.
+      PORTAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+      PORTAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+      PLUGIN_ID: ${{ inputs.plugin_deployment_id }}
+      LIBRARY_ID: ${{ inputs.library_deployment_id }}
+    steps:
+      - name: Check both deployments are validated
+        run: |
+          auth="Bearer $(printf '%s:%s' "$PORTAL_USERNAME" "$PORTAL_PASSWORD" | base64 | tr -d '\n')"
+          for id in "$PLUGIN_ID" "$LIBRARY_ID"; do
+            body=$(curl -sS -X POST -H "Authorization: $auth" \
+              "https://central.sonatype.com/api/v1/publisher/status?id=$id")
+            state=$(printf '%s' "$body" | grep -o '"deploymentState":"[A-Z_]*"' | cut -d'"' -f4)
+            echo "$id: ${state:-unknown}"
+            # PUBLISHING and PUBLISHED are already on their way out and must not be sent again;
+            # anything else is not ready to go.
+            if [[ "$state" != "VALIDATED" ]]; then
+              echo "::error::deployment $id is '${state:-unknown}', not VALIDATED. Nothing released."
+              printf '%s\n' "$body"
+              exit 1
+            fi
+          done
+
+      - name: Release both
+        run: |
+          auth="Bearer $(printf '%s:%s' "$PORTAL_USERNAME" "$PORTAL_PASSWORD" | base64 | tr -d '\n')"
+          # The plugin build goes first, matching the upload order in `release.yml`.
+          for id in "$PLUGIN_ID" "$LIBRARY_ID"; do
+            code=$(curl -sS -o /tmp/publish-body -w '%{http_code}' -X POST \
+              -H "Authorization: $auth" \
+              "https://central.sonatype.com/api/v1/publisher/deployment/$id")
+            echo "$id -> HTTP $code"
+            if [[ "$code" != "2"* ]]; then
+              echo "::error::releasing $id failed with HTTP $code"
+              cat /tmp/publish-body
+              exit 1
+            fi
+          done
+
+      - name: Say what was released
+        run: |
+          {
+            echo "### Both deployments released"
+            echo
+            echo "- plugins: \`${PLUGIN_ID}\`"
+            echo "- library: \`${LIBRARY_ID}\`"
+            echo
+            echo "They are public once the Portal finishes syncing to"
+            echo "<https://repo1.maven.org/maven2/dev/carcara/>, which takes a while."
+          } >> "$GITHUB_STEP_SUMMARY"
