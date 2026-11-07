@@ -3,7 +3,7 @@
 The `sample/` directory holds an app that uses Perch from end to end. It has two feature modules
 that declare routes, one module that aggregates them, an Android app and an iOS app.
 
-The [Multi-module apps](guides/multi-module.md#a-typical-layout) guide describes its module layout.
+The [Multi-module apps](guides/multi-module.md) guide shows its module layout.
 
 ## Build and test the sample
 

@@ -58,30 +58,28 @@ parser.parse("otherapp://payments/abc123")             // null, the scheme is no
 parser.parse("myapp://payments")                       // null, no route matches
 ```
 
-`parse` reads a URL in this sequence:
+??? note "How `parse` reads a URL"
 
-1. It removes the whitespace at the start and at the end.
-2. It reads the scheme before `://`. If the scheme is not in `schemes`, `parse` returns `null`.
-3. If the scheme is `http` or `https`, it reads the host. If the host is not in `hosts`, `parse`
-   returns `null`.
-4. It removes the fragment, which starts at `#`.
-5. It divides the path into segments at `/` and removes the empty segments.
-6. It divides the query string into `name=value` pairs at `&`. It removes a pair that has no `=`.
-7. It percent-decodes each segment, each name and each value.
-8. It tries each registered route. It returns the first route that matches the path and gets a
-   value for each required property.
+    `parse` reads a URL in this sequence:
 
-Because Perch rejects collisions, at most one route matches the path of a URL.
+    1. It removes the whitespace at the start and at the end.
+    2. It reads the scheme before `://`. If the scheme is not in `schemes`, `parse` returns `null`.
+    3. If the scheme is `http` or `https`, it reads the host. If the host is not in `hosts`, `parse`
+       returns `null`.
+    4. It removes the fragment, which starts at `#`.
+    5. It divides the path into segments at `/` and removes the empty segments.
+    6. It divides the query string into `name=value` pairs at `&`. It removes a pair that has no `=`.
+    7. It percent-decodes each segment, each name and each value.
+    8. It tries each registered route. It returns the first route that matches the path and gets a
+       value for each required property.
 
-### Percent-encoded characters
+    Perch decodes each segment and each query component after it divides the URL. Thus `%2F` in a value
+    becomes a `/` inside that value. It does not start a new segment.
 
-Perch decodes each segment and each query component after it divides the URL. Thus `%2F` in a value
-becomes a `/` inside that value. It does not start a new segment.
-
-- `+` stays `+`. A `+` means a space only in form data, not in a URL.
-- A `%` that is not followed by two hex digits stays as it is.
-- Bytes that are not valid UTF-8 become the replacement character, `U+FFFD`.
-- Perch does not normalize the path. A `{path...}` tailcard receives `.` and `..` as they are.
+    - `+` stays `+`. A `+` means a space only in form data, not in a URL.
+    - A `%` that is not followed by two hex digits stays as it is.
+    - Bytes that are not valid UTF-8 become the replacement character, `U+FFFD`.
+    - Perch does not normalize the path. A `{path...}` tailcard receives `.` and `..` as they are.
 
 ### A string without a scheme
 
@@ -113,21 +111,23 @@ parser.toUrl(SearchLink("kotlin", page = 2))       // "myapp://search?query=kotl
 parser.toUrl(PaymentLink("a b/c é"))               // "myapp://payments/a%20b%2Fc%20%C3%A9"
 ```
 
-The scheme and the host come from the parser:
+??? note "How `toUrl` builds the URL"
 
-- If `schemes` contains a custom scheme, the URL uses the first custom scheme. The result is
-  `<scheme>://<path>`.
-- If `schemes` contains only `http` and `https`, the URL uses the first scheme and the first host.
-  The result is `<scheme>://<host>/<path>`.
+    The scheme and the host come from the parser:
 
-The path and the query come from the route:
+    - If `schemes` contains a custom scheme, the URL uses the first custom scheme. The result is
+      `<scheme>://<path>`.
+    - If `schemes` contains only `http` and `https`, the URL uses the first scheme and the first host.
+      The result is `<scheme>://<host>/<path>`.
 
-- Each property fills the placeholder that has its name.
-- The other properties become query parameters, in the sequence of their declaration.
-- A property with a default value is written too.
-- A `null` value and an empty list are not written.
-- Perch percent-encodes each segment and each query component. Only the RFC 3986 unreserved
-  characters stay as they are: letters, digits, `-`, `.`, `_` and `~`.
+    The path and the query come from the route:
+
+    - Each property fills the placeholder that has its name.
+    - The other properties become query parameters, in the sequence of their declaration.
+    - A property with a default value is written too.
+    - A `null` value and an empty list are not written.
+    - Perch percent-encodes each segment and each query component. Only the RFC 3986 unreserved
+      characters stay as they are: letters, digits, `-`, `.`, `_` and `~`.
 
 `toUrl` does not need the route to be registered.
 

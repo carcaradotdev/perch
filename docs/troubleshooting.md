@@ -1,4 +1,4 @@
-# Errors and warnings
+# Troubleshooting
 
 This page lists each message that Perch gives, where it comes from, and what to do. In the
 messages, `<...>` shows a value that changes, such as a module path.
@@ -34,7 +34,7 @@ dev.carcara.perch: <module> declares 1 Kotlin target (jvm), and Perch needs at l
 ```
 
 Add a second target to the producer module, or move its routes to a module that has two or more
-targets. See [Two targets or more](../guides/multi-module.md#two-targets-or-more).
+targets. See [Two targets or more](guides/multi-module.md#two-targets-or-more).
 
 ### KSP is not applied
 
@@ -76,7 +76,7 @@ and report the problem.
 ### `SwiftPMLockTaskAggregationBuildService` cast exception
 
 The Kotlin Gradle plugin is in two classloaders. Declare every plugin version once, in the root
-build file, with `apply false`. See [Installation](../get-started/installation.md#2-declare-the-plugins-in-the-root-build-file).
+build file, with `apply false`. See [Get started](get-started.md#2-declare-the-plugins-in-the-root-build-file).
 
 ## KSP errors
 
@@ -89,7 +89,7 @@ Deep link collision detected. Pattern '<pattern>' conflicts with '<pattern>', al
 ```
 
 Two routes in the module can match the same URL. Change one of the two patterns. See
-[Collisions](../guides/routes.md#collisions).
+[Collisions](guides/routes.md#collisions).
 
 ### More than one parent
 
@@ -98,7 +98,7 @@ There are multiple parents for deep link '<class>'.
 ```
 
 The route has more than one property whose type is a route. Keep one parent property. See
-[Nested routes](../guides/routes.md#nested-routes).
+[Nested routes](guides/routes.md#nested-routes).
 
 ### A route that is its own parent
 
@@ -117,7 +117,7 @@ Deep link collision between modules. '<class>' in <module> declares '<pattern>',
 ```
 
 Change one of the two patterns. See
-[Collisions between modules](../guides/multi-module.md#collisions-between-modules).
+[Collisions between modules](guides/multi-module.md#collisions-between-modules).
 
 ### No routes found
 
@@ -158,7 +158,7 @@ DeepLinkParser was given [https] with no hosts, which lets any website on the in
 ```
 
 `DeepLinkParser` throws `IllegalArgumentException`. Give at least one scheme. If `schemes` contains
-`http` or `https`, give the hosts that you own. See [Schemes and hosts](../guides/schemes-and-hosts.md).
+`http` or `https`, give the hosts that you own. See [Schemes and hosts](guides/schemes-and-hosts.md).
 
 ### `register`
 

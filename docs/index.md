@@ -61,6 +61,5 @@ The KSP processor and the Gradle plugins run inside Gradle, on JDK 21 or later.
 
 ## Next steps
 
-- [Install Perch](get-started/installation.md).
-- [Declare a route and parse a URL](get-started/quick-start.md).
+- [Get started](get-started.md).
 - [Run the sample app](sample.md).

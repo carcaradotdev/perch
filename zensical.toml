@@ -27,10 +27,7 @@ edit_uri = "edit/main/docs/"
 
 nav = [
   { "Home" = "index.md" },
-  { "Get started" = [
-    { "Installation" = "get-started/installation.md" },
-    { "Quick start" = "get-started/quick-start.md" },
-  ] },
+  { "Get started" = "get-started.md" },
   { "Guides" = [
     { "Declare routes" = "guides/routes.md" },
     { "Parse and build URLs" = "guides/urls.md" },
@@ -38,11 +35,7 @@ nav = [
     { "Multi-module apps" = "guides/multi-module.md" },
     { "Navigation and DI" = "guides/navigation.md" },
   ] },
-  { "Reference" = [
-    { "Gradle plugins" = "reference/gradle-plugins.md" },
-    { "Runtime API" = "reference/runtime-api.md" },
-    { "Errors and warnings" = "reference/errors.md" },
-  ] },
+  { "Troubleshooting" = "troubleshooting.md" },
   { "Sample app" = "sample.md" },
   { "Contribute" = "contributing.md" },
 ]

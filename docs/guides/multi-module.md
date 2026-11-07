@@ -1,175 +1,107 @@
 # Multi-module apps
 
-In a modular app, each feature declares its own routes, and one module collects them. Perch uses two
-Gradle plugins for this:
+In a modular app, each feature declares its own routes, and one module collects them:
 
 | Plugin | Apply it to | It generates |
 | --- | --- | --- |
-| `dev.carcara.perch` | Each module that declares routes. | A route manifest, and `internal fun perchModuleParser()`. |
-| `dev.carcara.perch.aggregation` | The module that assembles the app. | `public fun perchParser()`. |
+| `dev.carcara.perch` | Each module that declares routes. | `internal fun perchModuleParser()` |
+| `dev.carcara.perch.aggregation` | The module that assembles the app. | `public fun perchParser()` |
 
-A module can apply one plugin, both plugins or no plugin.
+A module can apply one plugin, both plugins or no plugin. [Get started](../get-started.md) shows the
+build file for each.
 
-## A typical layout
+??? example "The layout of the sample app"
 
-The [sample app](../sample.md) uses this layout:
+    ```text
+    sample/
+      sample-navigation/        SampleRoute, the supertype of all routes
+      features/home/api/        producer: /home
+      features/payments/api/    producer: /payments/{id} and /payment-approvals
+      features/payments/impl/   the handler for the approvals link
+      sample-di/                the router, and its interfaces for the platform apps
+      sample-app/               aggregator: perchParser() for both features
+      sample-android/           the Android app
+      sample-ios-app/           the iOS app
+    ```
 
-```text
-sample/
-  sample-navigation/        SampleRoute, the supertype of all routes
-  features/home/api/        producer: @DeepLink("/home")
-  features/payments/api/    producer: /payments/{id} and /payment-approvals
-  features/payments/impl/   the handler for the approvals link
-  sample-di/                the router, and its interfaces for the platform apps
-  sample-app/               aggregator: perchParser() for both features
-  sample-android/           the Android app
-  sample-ios-app/           the iOS app
-```
+    No central list names the routes. To add a feature, add a module.
 
-Each feature `api` module applies the producer plugin. `sample-app` applies the aggregator plugin.
-No central list names the routes. To add a feature, add a module.
+## Options
 
-## How the pipeline works
+| Extension | Property | Description |
+| --- | --- | --- |
+| `perch` | `outputPackage` | Required. The package of `perchModuleParser()`. An empty string publishes the routes and generates no parser. |
+| `perch` | `processorCoordinates` | Optional. The KSP processor, as a Maven coordinate or a project path. The default is `perch-ksp` of the same version as the plugin. |
+| `perchAggregation` | `outputPackage` | Required. The package of `perchParser()`. |
 
-```mermaid
-graph TB
-  subgraph producer["Producer module"]
-    src["@DeepLink classes in commonMain"] --> ksp["KSP: kspCommonMainKotlinMetadata"]
-    ksp --> manifest["perch-manifest-*.txt"]
-    ksp --> modparser["perchModuleParser()"]
-  end
-  subgraph aggregator["Aggregator module"]
-    collect["perchManifests configuration"] --> task["generateDeepLinkRegistration"]
-    task --> parser["perchParser()"]
-  end
-  manifest -->|perchManifestElements| collect
-```
+## Two targets or more
 
-1. The producer plugin adds the Perch KSP processor to the `commonMain` metadata compilation.
-2. The processor finds the `@DeepLink` classes in the module and checks them for collisions.
-3. The processor writes a route manifest and `perchModuleParser()`.
-4. The producer plugin publishes the manifest on the `perchManifestElements` configuration.
-5. The aggregator plugin resolves the manifests of its `commonMain` dependencies.
-6. The `generateDeepLinkRegistration` task checks all routes for collisions and writes
-   `perchParser()` into `commonMain` of the aggregator module.
-
-## The producer plugin
-
-```kotlin title="features/payments/api/build.gradle.kts"
-plugins {
-    kotlin("multiplatform")
-    kotlin("plugin.serialization")
-    id("com.google.devtools.ksp")
-    id("dev.carcara.perch")
-}
-
-kotlin {
-    jvm()
-    iosSimulatorArm64()
-
-    sourceSets {
-        commonMain.dependencies {
-            api("dev.carcara.perch:perch-core:0.1.0")
-        }
-    }
-}
-
-perch {
-    outputPackage.set("com.example.payments.api")
-}
-```
-
-### Two targets or more
-
-**A module that applies `dev.carcara.perch` must declare at least two Kotlin targets.** The
+**A module that applies `dev.carcara.perch` must declare at least two Kotlin targets.** The KSP
 processor runs on the `commonMain` compilation, and Kotlin Multiplatform creates that compilation
-only for two or more targets. With one target, the processor has no code to scan.
+only for two or more targets. If a producer module has fewer, the build fails at configuration time.
 
-If a producer module has fewer than two targets, the build fails at configuration time. The message
-names the module and its targets. The aggregator module does not have this rule.
+The aggregator module does not have this rule.
 
-### Contribute routes without a parser
+## Which dependencies the aggregator reads
 
-If a feature module does not need its own parser, set `outputPackage` to an empty string. The
-module then publishes its manifest, but it does not generate `perchModuleParser()`.
+The aggregator reads the dependencies that `commonMain` of its module compiles against:
 
-```kotlin
-perch {
-    outputPackage.set("")
-}
-```
+- `commonMain` dependencies declared with `implementation` or `api`.
+- Transitive dependencies through `api` only. If `A` depends on `B` with `implementation`, an
+  aggregator that depends on `A` does not see the routes of `B`.
 
-## The aggregator plugin
+It does not read `compileOnly` dependencies, or dependencies of `androidMain`, `iosMain` and the
+other platform source sets.
 
-```kotlin title="app/build.gradle.kts"
-plugins {
-    kotlin("multiplatform")
-    id("dev.carcara.perch.aggregation")
-}
+!!! warning "Declare each producer dependency in `commonMain`"
 
-kotlin {
-    jvm()
-    iosSimulatorArm64()
+    A route that the aggregator cannot see is not in `perchParser()`, and the build does not tell
+    you. `parse` then returns `null` for its URLs.
 
-    sourceSets {
-        commonMain.dependencies {
-            api(project(":features:home:api"))
-            api(project(":features:payments:api"))
-        }
-    }
-}
-
-perchAggregation {
-    outputPackage.set("com.example.app")
-}
-```
-
-The aggregator writes `PerchDeepLinkRegistration.kt`. The producer writes `DeepLinkRegistration.kt`.
-The names are different, so one module can apply both plugins.
-
-### Which dependencies the aggregator reads
-
-The aggregator reads the same dependency graph that `commonMain` of its module compiles against.
-Thus each route that it finds is a class that the module can reference.
-
-- It reads `commonMain` dependencies declared with `implementation` or `api`.
-- It reads a transitive dependency only through `api`. If module `A` depends on `B` with
-  `implementation`, an aggregator that depends on `A` does not see the routes of `B`. Depend on `B`
-  directly, or change `A` to use `api`.
-- It does not read dependencies of platform source sets, such as `androidMain` or `iosMain`.
-- It does not read `compileOnly` dependencies.
-
-!!! warning "A route that the aggregator cannot see fails without an error"
-
-    Declare each producer dependency in `commonMain`. If you declare it in a platform source set,
-    the route is not in `perchParser()`, and `parse` returns `null` for its URLs.
-
-    The generated registration is in `commonMain`. Code in `commonMain` cannot reference a class
-    that only `androidMain` can see, so this rule is necessary.
-
-After each run, the task logs what it found:
+To see what the aggregator found, read this line in the build output:
 
 ```text
 Perch: generated perchParser() for com.example.app with 3 route(s) from 2 manifest(s):
 ```
 
-If a route is not there, examine where the aggregator module declares the dependency on its
-producer.
+## Collisions between modules
 
-### Collisions between modules
+The KSP processor sees one module at a time. If two features declare patterns that can match the
+same URL, the aggregator stops the build and names both routes. Change one of the two patterns. See
+[Collisions](routes.md#collisions).
 
-The KSP processor sees one module at a time. Two features can each declare a pattern that is
-correct in its own module, but that collides with the other. The aggregator finds this and stops the
-build:
+??? note "How the pipeline works"
 
-```text
-Deep link collision between modules. 'com.example.a.PaymentLink' in :features:a declares 'payments/{id}', and 'com.example.b.PaymentLink' in :features:b declares 'payments/{code}'. A URL matching one matches the other, so the parser cannot know which route to return. The manifests are perch-manifest-features-a.txt and perch-manifest-features-b.txt; change one of the two patterns.
-```
+    ```mermaid
+    graph TB
+      subgraph producer["Producer module"]
+        src["@DeepLink classes in commonMain"] --> ksp["KSP: kspCommonMainKotlinMetadata"]
+        ksp --> manifest["perch-manifest-*.txt"]
+        ksp --> modparser["perchModuleParser()"]
+      end
+      subgraph aggregator["Aggregator module"]
+        collect["perchManifests configuration"] --> task["generateDeepLinkRegistration"]
+        task --> parser["perchParser()"]
+      end
+      manifest -->|perchManifestElements| collect
+    ```
 
-Change one of the two patterns.
+    1. The producer plugin adds the KSP processor to the `commonMain` metadata compilation.
+    2. The processor finds the `@DeepLink` classes, checks them for collisions, and writes a route
+       manifest and `perchModuleParser()`.
+    3. The producer plugin publishes the manifest on the `perchManifestElements` configuration.
+    4. The aggregator resolves the manifests of its `commonMain` dependencies.
+    5. The `generateDeepLinkRegistration` task checks all routes for collisions and writes
+       `perchParser()`. The task is cacheable.
 
-## One module only
+    | Generated file | Contents |
+    | --- | --- |
+    | `build/generated/ksp/metadata/commonMain/kotlin/<package>/DeepLinkRegistration.kt` | `perchModuleParser()` |
+    | `build/generated/ksp/metadata/commonMain/resources/perch-manifest-<module>.txt` | The route manifest |
+    | `build/generated/perch/commonMain/kotlin/<package>/PerchDeepLinkRegistration.kt` | `perchParser()` |
 
-An app with all its routes in one module does not need the aggregator. Apply the producer plugin
-and call `perchModuleParser()` from the same module. See
-[Quick start](../get-started/quick-start.md#one-module-only).
+    Each manifest line holds one route as `pattern|class|module`, for example:
+
+    ```text
+    payments/{id}|com.example.sample.payments.api.PaymentRoutes.Details|:sample:features:payments:api
+    ```

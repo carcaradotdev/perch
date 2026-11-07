@@ -21,16 +21,16 @@ Gradle plugins from end to end.
 - Detekt does not examine test sources.
 - The Apple targets compile only on macOS.
 
-## Code that the builds share
+??? note "Code that the builds share"
 
-The three builds cannot depend on one another. Thus the path-pattern rules and the manifest format
-are shared as source:
+    The three builds cannot depend on one another. Thus the path-pattern rules and the manifest format
+    are shared as source:
 
-- `shared/routing` holds the collision rules. `perch-core`, `perch-ksp` and `perch-gradle-plugin`
-  compile it.
-- `shared/manifest` holds the manifest format. `perch-ksp` and `perch-gradle-plugin` compile it.
+    - `shared/routing` holds the collision rules. `perch-core`, `perch-ksp` and `perch-gradle-plugin`
+      compile it.
+    - `shared/manifest` holds the manifest format. `perch-ksp` and `perch-gradle-plugin` compile it.
 
-The declarations in these directories are `internal`, and they import nothing.
+    The declarations in these directories are `internal`, and they import nothing.
 
 ## License header
 
@@ -106,14 +106,16 @@ A published GitHub Release starts the release. The tag is the version, for examp
    [central.sonatype.com](https://central.sonatype.com/publishing/deployments). The workflow
    releases nothing unless both deployments have the state `VALIDATED`.
 
-The release needs four repository secrets:
+??? note "Repository secrets"
 
-| Secret | Value |
-| --- | --- |
-| `MAVEN_CENTRAL_USERNAME` | The user name of a Central Portal user token. |
-| `MAVEN_CENTRAL_PASSWORD` | The password of that user token. |
-| `SIGNING_IN_MEMORY_KEY` | The armored private GPG key. |
-| `SIGNING_IN_MEMORY_KEY_PASSWORD` | The password of that key. |
+    The release needs four repository secrets:
+
+    | Secret | Value |
+    | --- | --- |
+    | `MAVEN_CENTRAL_USERNAME` | The user name of a Central Portal user token. |
+    | `MAVEN_CENTRAL_PASSWORD` | The password of that user token. |
+    | `SIGNING_IN_MEMORY_KEY` | The armored private GPG key. |
+    | `SIGNING_IN_MEMORY_KEY_PASSWORD` | The password of that key. |
 
 !!! warning
 

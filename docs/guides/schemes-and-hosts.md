@@ -36,28 +36,28 @@ parser.parse("myapp://payments/abc123")               // PaymentLink(id = "abc12
 parser.parse("myapp://myapp.example/payments/abc123") // null, the path has three segments
 ```
 
-## How Perch reads the host
+??? note "How Perch reads the host"
 
-For `http` and `https`, the authority is the text between `://` and the first `/`, `?`, `#` or `\`.
-Perch removes the user information before `@` and the port after `:`. The remainder is the host.
-Perch compares hosts without letter case.
+    For `http` and `https`, the authority is the text between `://` and the first `/`, `?`, `#` or `\`.
+    Perch removes the user information before `@` and the port after `:`. The remainder is the host.
+    Perch compares hosts without letter case.
 
-The examples use `hosts = setOf("myapp.example")`:
+    The examples use `hosts = setOf("myapp.example")`:
 
-| URL | Host | Result |
-| --- | --- | --- |
-| `https://myapp.example/payments/1` | `myapp.example` | Accepted. |
-| `https://MyApp.Example/payments/1` | `myapp.example` | Accepted. Letter case is ignored. |
-| `https://myapp.example:8443/payments/1` | `myapp.example` | Accepted. The port is removed. |
-| `https://user@myapp.example/payments/1` | `myapp.example` | Accepted. The user information is removed. |
-| `https://myapp.example@evil.example/payments/1` | `evil.example` | Rejected. |
-| `https://evil.example\@myapp.example/payments/1` | `evil.example` | Rejected. A `\` ends the authority, as in a browser. |
-| `https:///payments/1` | None | Rejected. The authority is empty. |
-| `https://evil.example/payments/1` | `evil.example` | Rejected. |
+    | URL | Host | Result |
+    | --- | --- | --- |
+    | `https://myapp.example/payments/1` | `myapp.example` | Accepted. |
+    | `https://MyApp.Example/payments/1` | `myapp.example` | Accepted. Letter case is ignored. |
+    | `https://myapp.example:8443/payments/1` | `myapp.example` | Accepted. The port is removed. |
+    | `https://user@myapp.example/payments/1` | `myapp.example` | Accepted. The user information is removed. |
+    | `https://myapp.example@evil.example/payments/1` | `evil.example` | Rejected. |
+    | `https://evil.example\@myapp.example/payments/1` | `evil.example` | Rejected. A `\` ends the authority, as in a browser. |
+    | `https:///payments/1` | None | Rejected. The authority is empty. |
+    | `https://evil.example/payments/1` | `evil.example` | Rejected. |
 
-An IPv6 host keeps its brackets. To accept `https://[::1]/payments/1`, use `hosts = setOf("[::1]")`.
+    An IPv6 host keeps its brackets. To accept `https://[::1]/payments/1`, use `hosts = setOf("[::1]")`.
 
-Perch does not decode the authority. The host check uses the same bytes that a browser uses.
+    Perch does not decode the authority. The host check uses the same bytes that a browser uses.
 
 ## Register the scheme and the hosts with the operating system
 
