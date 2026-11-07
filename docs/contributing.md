@@ -67,11 +67,15 @@ The configuration and the navigation are in `zensical.toml`.
 Zensical needs Python 3.11 or later. To preview the site:
 
 ```bash
+python3 --version   # must be 3.11 or later; on macOS the system python3 is 3.9
 python3 -m venv .venv
 source .venv/bin/activate
-pip install zensical
+pip install zensical==0.1.0
 zensical serve
 ```
+
+Install the version that `.github/workflows/docs.yml` pins. With an older Python, an unpinned
+`pip install zensical` installs version 0.0.2, which has no `zensical` command.
 
 Then open `http://localhost:8000`.
 
